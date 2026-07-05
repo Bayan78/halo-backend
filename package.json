@@ -1,0 +1,16 @@
+{
+  "name": "halo-credits-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "railway-server.js",
+  "scripts": {
+    "start": "node railway-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "better-sqlite3": "^11.3.0"
+  }
+}
