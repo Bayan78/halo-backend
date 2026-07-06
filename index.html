@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HALO · AI Studio</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0A14;--bg-2:#100E1D;
+    --surface:rgba(28,24,46,.55);--surface-solid:#161327;
+    --line:rgba(160,150,220,.14);--line-strong:rgba(160,150,220,.28);
+    --txt:#F5F3FF;--muted:#9C97B8;--muted-dim:#6F6A8C;
+    --violet:#A855F7;--magenta:#EC4899;--cyan:#22D3EE;--green:#34D399;
+    --grad:linear-gradient(105deg,#A855F7 0%,#EC4899 48%,#22D3EE 100%);
+    --grad-soft:linear-gradient(105deg,rgba(168,85,247,.18),rgba(236,72,153,.14),rgba(34,211,238,.16));
+    --r:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;line-height:1.5;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(60% 45% at 82% 0%,rgba(168,85,247,.18),transparent 60%),
+      radial-gradient(55% 45% at 8% 8%,rgba(34,211,238,.14),transparent 60%),
+      radial-gradient(50% 40% at 60% 100%,rgba(236,72,153,.12),transparent 60%);}
+  .app{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:calc(22px + env(safe-area-inset-top)) 20px calc(60px + env(safe-area-inset-bottom))}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .mark{width:42px;height:42px;border-radius:13px;position:relative;flex:none;background:var(--grad);box-shadow:0 8px 30px -6px rgba(168,85,247,.55)}
+  .mark::after{content:"";position:absolute;inset:6px;border-radius:8px;background:var(--bg-2)}
+  .mark::before{content:"";position:absolute;inset:0;border-radius:13px;background:var(--grad);filter:blur(9px);opacity:.6;z-index:-1}
+  .brand h1{font-family:'Space Grotesk';font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1}
+  .brand span{display:block;font-size:11px;color:var(--muted);letter-spacing:.22em;text-transform:uppercase;margin-top:3px}
+  .right-cluster{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+  .credits{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-strong);border-radius:999px;padding:8px 12px 8px 10px;cursor:pointer;backdrop-filter:blur(14px);transition:border-color .2s, box-shadow .2s}
+  .credits:hover{border-color:var(--violet)}
+  .credits .bolt{width:22px;height:22px;border-radius:7px;background:var(--grad);display:flex;align-items:center;justify-content:center}
+  .credits .bolt svg{width:13px;height:13px;color:#fff}
+  .credits .n{font-family:'Space Grotesk';font-weight:600;font-size:15px}
+  .credits .plus{font-size:16px;color:var(--cyan);font-weight:600;line-height:1;margin-left:1px}
+  @keyframes flash{0%,100%{box-shadow:0 0 0 0 rgba(236,72,153,0)}30%{box-shadow:0 0 0 4px rgba(236,72,153,.35)}}
+  .credits.flash{animation:flash .7s ease 2}
+
+  .tabs{display:flex;gap:5px;background:var(--surface);border:1px solid var(--line);padding:5px;border-radius:14px;backdrop-filter:blur(14px)}
+  .tab{font-family:'Space Grotesk';font-weight:500;font-size:14px;color:var(--muted);padding:9px 16px;border-radius:10px;cursor:pointer;border:none;background:none;transition:color .2s, background .25s;white-space:nowrap}
+  .tab:hover{color:var(--txt)}
+  .tab.active{color:#fff;background:var(--grad);box-shadow:0 6px 22px -8px rgba(236,72,153,.6)}
+
+  .view{display:none;grid-template-columns:380px 1fr;gap:22px;align-items:start}
+  .view.active{display:grid}
+  @media(max-width:860px){.view.active{grid-template-columns:1fr}}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;backdrop-filter:blur(16px)}
+  .panel h2{font-family:'Space Grotesk';font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:15px}
+  label.fld{display:block;font-size:12px;color:var(--muted);margin:16px 0 8px;font-weight:500;letter-spacing:.02em}
+  label.fld:first-of-type{margin-top:0}
+  textarea,input,select{width:100%;background:rgba(11,10,20,.6);border:1px solid var(--line-strong);border-radius:12px;color:var(--txt);font-family:inherit;font-size:14px;padding:12px 14px;transition:border-color .2s, box-shadow .2s;resize:none}
+  textarea{min-height:92px;line-height:1.55}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(168,85,247,.16)}
+  textarea::placeholder{color:var(--muted-dim)}
+  select{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%239C97B8' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+  .enhance{display:inline-flex;align-items:center;gap:7px;margin-top:10px;font-size:12.5px;font-weight:500;color:var(--cyan);cursor:pointer;background:none;border:none;padding:4px 0;transition:opacity .2s}
+  .enhance:hover{opacity:.75}.enhance:disabled{opacity:.4;cursor:default}.enhance svg{width:14px;height:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:12.5px;color:var(--muted);background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:999px;padding:7px 13px;cursor:pointer;transition:all .18s}
+  .chip:hover{color:var(--txt)}
+  .chip.on{color:#fff;border-color:transparent;background:var(--grad-soft);box-shadow:inset 0 0 0 1px rgba(168,85,247,.5)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .go{width:100%;margin-top:22px;font-family:'Space Grotesk';font-weight:600;font-size:15px;color:#fff;background:var(--grad);border:none;border-radius:13px;padding:15px;cursor:pointer;letter-spacing:.01em;position:relative;overflow:hidden;box-shadow:0 10px 34px -12px rgba(236,72,153,.7);transition:transform .12s, box-shadow .2s;display:flex;align-items:center;justify-content:center;gap:9px}
+  .go:hover{transform:translateY(-1px);box-shadow:0 14px 40px -12px rgba(236,72,153,.8)}
+  .go:active{transform:translateY(0)}
+  .go:disabled{opacity:.55;cursor:default;transform:none}
+  .go .cost{font-size:12px;font-weight:500;opacity:.85;display:inline-flex;align-items:center;gap:3px}
+
+  .stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;backdrop-filter:blur(16px);min-height:420px;display:flex;flex-direction:column}
+  .stage-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .stage-head h2{font-family:'Space Grotesk';font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(11,10,20,.55);border:1px solid var(--line);position:relative;overflow:hidden;min-height:360px}
+  .canvas-wrap img,.canvas-wrap canvas,.canvas-wrap video{max-width:100%;max-height:520px;border-radius:10px;display:block}
+  .placeholder{text-align:center;color:var(--muted-dim);padding:40px}
+  .placeholder .ic{width:54px;height:54px;margin:0 auto 14px;opacity:.6}
+  .placeholder p{font-size:14px}
+  .loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(11,10,20,.72)}
+  .scanner{width:70%;max-width:300px;height:4px;border-radius:4px;background:rgba(160,150,220,.12);overflow:hidden;position:relative}
+  .scanner::after{content:"";position:absolute;inset:0;width:40%;background:var(--grad);border-radius:4px;animation:scan 1.15s ease-in-out infinite}
+  @keyframes scan{0%{transform:translateX(-110%)}100%{transform:translateX(360%)}}
+  .loading .lbl{font-family:'Space Grotesk';font-size:13px;color:var(--muted);letter-spacing:.05em}
+  .result-actions{display:flex;gap:10px;margin-top:16px}
+  .btn-ghost{flex:1;font-family:'Space Grotesk';font-weight:500;font-size:13.5px;color:var(--txt);background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:11px;padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:border-color .2s,background .2s}
+  .btn-ghost:hover{border-color:var(--violet);background:rgba(168,85,247,.1)}
+  .btn-ghost svg{width:15px;height:15px}
+  .btn-ghost:disabled{opacity:.4;cursor:default}
+  .err{color:#FCA5A5;font-size:13px;text-align:center;padding:20px;max-width:340px}
+
+  #view-gallery.active{display:block}
+  .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:4px}
+  .gal-item{position:relative;border-radius:13px;overflow:hidden;aspect-ratio:1;border:1px solid var(--line);cursor:pointer;background:var(--surface-solid)}
+  .gal-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
+  .gal-item:hover img{transform:scale(1.06)}
+  .gal-item .dl{position:absolute;bottom:8px;right:8px;width:30px;height:30px;border-radius:9px;background:rgba(11,10,20,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;border:1px solid var(--line-strong)}
+  .gal-item:hover .dl{opacity:1}
+  .gal-item .dl svg{width:14px;height:14px;color:#fff}
+  .gal-empty{text-align:center;color:var(--muted-dim);padding:80px 20px;font-size:14px}
+  #view-templates.active{display:block}
+  .tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin-top:4px}
+  .tpl-card{position:relative;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:14px;padding:18px 15px;cursor:pointer;transition:transform .14s,border-color .2s,background .2s}
+  .tpl-card:hover{transform:translateY(-2px);border-color:var(--violet);background:rgba(168,85,247,.08)}
+  .tpl-card .emo{font-size:26px;line-height:1}
+  .tpl-card .tn{font-family:'Space Grotesk';font-weight:600;font-size:14px;margin-top:10px}
+  .tpl-card .td{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tpl-card .tpl-tag{position:absolute;top:12px;right:12px;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+  .tpl-sub{font-family:'Space Grotesk';font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:24px 0 12px}
+  .tpl-del{position:absolute;top:10px;left:10px;width:22px;height:22px;border-radius:7px;border:1px solid var(--line-strong);background:rgba(11,10,20,.7);color:var(--muted);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .tpl-del:hover{color:#FCA5A5;border-color:#FCA5A5}
+  .savetpl{width:100%;margin-top:10px;font-size:12.5px;font-weight:500;color:var(--muted);background:none;border:1px dashed var(--line-strong);border-radius:11px;padding:10px;cursor:pointer;transition:color .2s,border-color .2s}
+  .savetpl:hover{color:var(--txt);border-color:var(--violet)}
+  .seg{display:flex;gap:6px;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;padding:5px;margin-top:8px}
+  .seg-btn{flex:1;font-family:'Space Grotesk';font-weight:500;font-size:12.5px;color:var(--muted);background:none;border:none;border-radius:8px;padding:9px;cursor:pointer;transition:color .2s,background .2s}
+  .seg-btn.on{color:#fff;background:var(--grad-soft);box-shadow:inset 0 0 0 1px rgba(168,85,247,.5)}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);background:rgba(11,10,20,.5);border:1px solid var(--line);border-radius:999px;padding:5px 11px;letter-spacing:.03em}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .hint{font-size:11.5px;color:var(--muted-dim);margin-top:14px;line-height:1.6}
+
+  /* toast */
+  #toast{position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);z-index:50;background:var(--surface-solid);border:1px solid var(--line-strong);border-radius:13px;padding:13px 18px;font-size:13.5px;font-weight:500;color:var(--txt);box-shadow:0 16px 44px -12px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;max-width:88vw;text-align:center}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.reward{border-color:var(--green);box-shadow:0 16px 44px -12px rgba(52,211,153,.4)}
+
+  .hbtn{width:38px;height:38px;border-radius:11px;background:var(--surface);border:1px solid var(--line-strong);color:var(--muted);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(14px);transition:color .2s,border-color .2s}
+  .hbtn:hover{color:#fff;border-color:var(--violet)}
+  .store-overlay{position:fixed;inset:0;z-index:60;background:rgba(6,5,12,.72);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center}
+  .store-overlay.on{display:flex}
+  .store-sheet{width:100%;max-width:460px;background:var(--surface-solid);border:1px solid var(--line-strong);border-bottom:none;border-radius:20px 20px 0 0;padding:22px 20px calc(26px + env(safe-area-inset-bottom));animation:sheetUp .28s ease}
+  @keyframes sheetUp{from{transform:translateY(30px);opacity:.6}to{transform:translateY(0);opacity:1}}
+  .store-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .store-head h3{font-family:'Space Grotesk';font-size:18px;font-weight:600}
+  .store-head button{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+  .store-free{width:100%;font-family:'Space Grotesk';font-weight:600;font-size:14px;color:#fff;background:var(--grad);border:none;border-radius:13px;padding:14px;cursor:pointer;box-shadow:0 8px 24px -10px rgba(236,72,153,.6)}
+  .store-sub{font-size:11px;color:var(--muted-dim);text-align:center;margin:16px 0 12px;letter-spacing:.1em}
+  .pack{display:flex;align-items:center;justify-content:space-between;width:100%;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:13px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s,background .2s}
+  .pack:hover{border-color:var(--violet);background:rgba(168,85,247,.08)}
+  .pack .pc{font-family:'Space Grotesk';font-weight:600;font-size:15px}
+  .pack .pp{font-size:13px;color:var(--cyan);font-weight:600}
+  .store-partner{width:100%;margin-top:6px;font-size:13px;font-weight:500;color:var(--muted);background:none;border:1px dashed var(--line-strong);border-radius:12px;padding:12px;cursor:pointer;transition:color .2s,border-color .2s}
+  .store-partner:hover{color:#fff;border-color:var(--violet)}
+  .store-invite{width:100%;margin-top:10px;font-family:'Space Grotesk';font-weight:500;font-size:13.5px;color:var(--txt);background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .2s,background .2s}
+  .store-invite:hover{border-color:var(--violet);background:rgba(168,85,247,.08)}
+  .store-invite:disabled{opacity:.5;cursor:default}
+  .store-pro{width:100%;margin-top:10px;font-family:'Space Grotesk';font-weight:600;font-size:14px;color:#0B0A14;background:var(--grad);border:none;border-radius:12px;padding:13px;cursor:pointer;box-shadow:0 8px 24px -12px rgba(168,85,247,.7)}
+  .store-free:disabled{opacity:.5;cursor:default}
+  .store-bal{font-size:12.5px;color:var(--muted);text-align:center;margin:-6px 0 14px}
+  .store-bal b{color:var(--txt);font-weight:600}
+
+  /* ===== visual polish ===== */
+  body::before{animation:aurora 24s ease-in-out infinite alternate}
+  @keyframes aurora{0%{transform:translate3d(-2%,-1%,0) scale(1.05)}50%{transform:translate3d(2%,1.5%,0) scale(1.14)}100%{transform:translate3d(-1%,2%,0) scale(1.06)}}
+  body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.04;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .mark{animation:markpulse 4.5s ease-in-out infinite}
+  @keyframes markpulse{0%,100%{box-shadow:0 8px 30px -8px rgba(168,85,247,.55)}50%{box-shadow:0 10px 42px -6px rgba(236,72,153,.72)}}
+  .go::after,.store-pro::after{content:"";position:absolute;top:0;left:-65%;width:42%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);transform:skewX(-18deg);animation:shine 5s ease-in-out infinite;pointer-events:none}
+  .store-pro{position:relative;overflow:hidden}
+  @keyframes shine{0%,58%{left:-65%}100%{left:135%}}
+  .panel,.stage{transition:border-color .3s, box-shadow .3s}
+  .panel:hover,.stage:hover{border-color:rgba(160,150,220,.22)}
+  .tab.active{box-shadow:0 6px 22px -8px rgba(236,72,153,.6),0 0 0 1px rgba(255,255,255,.06) inset}
+  /* neon empty-state + плавное появление результата */
+  .placeholder{position:relative;overflow:hidden}
+  .placeholder .ic{color:var(--cyan);opacity:.7;filter:drop-shadow(0 0 10px rgba(34,211,238,.45));animation:icpulse 3s ease-in-out infinite}
+  @keyframes icpulse{0%,100%{opacity:.55;filter:drop-shadow(0 0 8px rgba(34,211,238,.35))}50%{opacity:.95;filter:drop-shadow(0 0 16px rgba(168,85,247,.6))}}
+  .placeholder::after{content:"";position:absolute;left:8%;right:8%;top:12%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent);box-shadow:0 0 14px rgba(34,211,238,.7);animation:scanline 3.4s ease-in-out infinite;opacity:.85}
+  @keyframes scanline{0%{top:12%}50%{top:85%}100%{top:12%}}
+  .canvas-wrap img,.canvas-wrap canvas,.canvas-wrap video{animation:resultIn .5s cubic-bezier(.2,.8,.2,1)}
+  @keyframes resultIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){body::before,.mark,.go::after,.store-pro::after{animation:none!important}}
+
+  .pro-badge{display:none;align-items:center;font-family:'Space Grotesk';font-size:10px;font-weight:700;letter-spacing:.14em;color:#0B0A14;background:var(--grad);padding:3px 7px;border-radius:6px;margin-left:8px;vertical-align:middle;line-height:1}
+  .pro-badge.on{display:inline-flex}
+  .pro-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .ptoggle{position:relative;font-size:12.5px;color:var(--muted);background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:10px;padding:8px 13px;cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;gap:7px}
+  .ptoggle:hover{color:var(--txt)}
+  .ptoggle.on{color:#fff;border-color:transparent;background:var(--grad-soft);box-shadow:inset 0 0 0 1px rgba(168,85,247,.5)}
+  .ptoggle.locked{opacity:.5}
+  .ptoggle .lk{font-size:11px}
+  .batch-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+  .batch-grid img{width:100%;object-fit:cover;border-radius:8px;aspect-ratio:1;cursor:pointer}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div><h1>HALO Studio<span class="pro-badge" id="pro-badge">PRO</span></h1><span>AI Photo &amp; Video</span></div>
+    </div>
+    <div class="right-cluster">
+      <button class="hbtn" id="partner-btn" title="Партнёрам и бонусам">★</button>
+      <div class="credits" id="credits" title="Пополнить кредиты">
+        <span class="bolt"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" fill="currentColor"/></svg></span>
+        <span class="n" id="credit-n">0</span>
+        <span class="plus">+</span>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-view="image">Изображение</button>
+        <button class="tab" data-view="video">Видео</button>
+        <button class="tab" data-view="templates">Шаблоны</button>
+        <button class="tab" data-view="gallery">Галерея</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- IMAGE -->
+  <section class="view active" id="view-image">
+    <div class="panel">
+      <h2>Параметры</h2>
+      <label class="fld">Опиши, что создать</label>
+      <textarea id="i-prompt" placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…"></textarea>
+      <button class="enhance" id="i-enhance"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="currentColor"/></svg>Улучшить промпт через AI</button>
+      <label class="fld">Стиль</label>
+      <div class="chips" id="i-styles"></div>
+      <div class="grid2" style="margin-top:16px">
+        <div><label class="fld" style="margin-top:0">Формат</label>
+          <select id="i-ratio"><option value="1024x1024">Квадрат · 1:1</option><option value="1280x720">Широкий · 16:9</option><option value="720x1280">Вертикаль · 9:16</option><option value="1024x768">Классика · 4:3</option></select></div>
+        <div><label class="fld" style="margin-top:0">Движок</label>
+          <select id="i-model"><option value="flux">Flux · качество</option><option value="turbo">Turbo · скорость</option></select></div>
+      </div>
+      <label class="fld">PRO-функции</label>
+      <div class="pro-row">
+        <button class="ptoggle" id="i-hd">HD ×1.5</button>
+        <button class="ptoggle" id="i-batch">×4 сразу</button>
+      </div>
+      <button class="go" id="i-go">Сгенерировать <span class="cost">· 1⚡</span></button>
+      <button class="savetpl" id="i-save">＋ Сохранить как шаблон</button>
+      <p class="hint">1 генерация = 1 кредит. Кредиты пополняются просмотром рекламы (⚡ вверху).</p>
+    </div>
+    <div class="stage">
+      <div class="stage-head"><h2>Результат</h2><span class="badge"><span class="dot"></span>готов</span></div>
+      <div class="canvas-wrap" id="i-canvas">
+        <div class="placeholder"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg><p>Опиши идею слева и нажми «Сгенерировать»</p></div>
+      </div>
+      <div class="result-actions">
+        <button class="btn-ghost" id="i-download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Скачать</button>
+        <button class="btn-ghost" id="i-variant" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 00-14.9-2M4 16a8 8 0 0014.9 2"/></svg>Вариация</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIDEO -->
+  <section class="view" id="view-video">
+    <div class="panel">
+      <h2>Параметры клипа</h2>
+      <label class="fld">Опиши сцену</label>
+      <textarea id="v-prompt" placeholder="неоновый киберпанк-город под дождём, движение сквозь улицы…"></textarea>
+      <button class="enhance" id="v-enhance"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="currentColor"/></svg>Улучшить промпт через AI</button>
+      <div class="seg" id="v-mode">
+        <button class="seg-btn on" data-mode="slideshow">Слайд-шоу · free</button>
+        <button class="seg-btn" data-mode="ai">AI-видео · PRO</button>
+      </div>
+      <div id="v-ai-opts" style="display:none;margin-top:14px">
+        <label class="fld" style="margin-top:0">Модель AI-видео</label>
+        <select id="v-aimodel">
+          <option value="kling">Kling 2.1 · кинематографично, 1080p</option>
+          <option value="veo3">Veo 3.1 · со звуком, 16:9/9:16</option>
+          <option value="seedance">Seedance Pro · выгодно, 1080p</option>
+        </select>
+        <label class="fld">Длина клипа</label>
+        <select id="v-aidur"></select>
+        <div id="v-audio-row">
+          <label class="fld">Звук</label>
+          <button class="ptoggle on" id="v-aiaudio" style="width:100%;justify-content:center">Звук вкл</button>
+        </div>
+      </div>
+      <label class="fld">Стиль</label>
+      <div class="chips" id="v-styles"></div>
+      <div class="grid2" style="margin-top:16px">
+        <div><label class="fld" style="margin-top:0">Формат</label>
+          <select id="v-ratio"><option value="1280x720">Широкий · 16:9</option><option value="720x1280">Вертикаль · 9:16</option><option value="1024x1024">Квадрат · 1:1</option></select></div>
+        <div id="v-frames-cell"><label class="fld" style="margin-top:0">Кадров</label>
+          <select id="v-frames"><option value="4">4 · короткий</option><option value="6" selected>6 · средний</option><option value="8">8 · длинный</option><option value="10" data-pro disabled>10 · PRO</option><option value="12" data-pro disabled>12 · PRO</option></select></div>
+      </div>
+      <div id="v-hd-wrap">
+        <label class="fld">PRO-функции</label>
+        <div class="pro-row">
+          <button class="ptoggle" id="v-hd">HD ×1.5</button>
+        </div>
+      </div>
+      <button class="go" id="v-go">Собрать клип <span class="cost">· 3⚡</span></button>
+      <button class="savetpl" id="v-save">＋ Сохранить как шаблон</button>
+      <p class="hint">Генерирует кадры и склеивает в клип с движением камеры. MP4 при поддержке браузера, иначе WebM.</p>
+    </div>
+    <div class="stage">
+      <div class="stage-head"><h2>Клип</h2><span class="badge" id="v-status"><span class="dot"></span>готов</span></div>
+      <div class="canvas-wrap" id="v-canvas">
+        <div class="placeholder"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none"/></svg><p>Опиши сцену и собери свой первый клип</p></div>
+      </div>
+      <div class="result-actions">
+        <button class="btn-ghost" id="v-download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Скачать видео</button>
+        <button class="btn-ghost" id="v-replay" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v6h6M20 8a8 8 0 00-14.9-2M20 20v-6h-6M4 16a8 8 0 0014.9 2"/></svg>Заново</button>
+        <button class="btn-ghost" id="v-mp4" disabled style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>MP4</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEMPLATES -->
+  <section class="view" id="view-templates">
+    <div class="panel">
+      <div class="stage-head" style="margin-bottom:18px"><h2 style="margin:0">Шаблоны</h2><span class="badge">тап — и всё готово</span></div>
+      <div id="tpl-grid"></div>
+    </div>
+  </section>
+
+  <!-- GALLERY -->
+  <section class="view" id="view-gallery">
+    <div class="panel">
+      <div class="stage-head" style="margin-bottom:18px"><h2 style="margin:0">Моя галерея</h2><span class="badge" id="gal-count">0 работ</span></div>
+      <div id="gal-body"><div class="gal-empty">Пока пусто. Сгенерируй что-нибудь — оно сохранится здесь.</div></div>
+    </div>
+  </section>
+</div>
+<div id="toast"></div>
+<div id="store" class="store-overlay">
+  <div class="store-sheet">
+    <div class="store-head"><h3>Кредиты</h3><button id="store-close">✕</button></div>
+    <div class="store-bal" id="store-bal"></div>
+    <button class="store-free" id="store-bonus">🎁 Ежедневный бонус · +5⚡</button>
+    <button class="store-invite" id="store-invite">👥 Пригласить друга · +20⚡</button>
+    <button class="store-pro" id="store-pro">⭐ Оформить PRO · AI-видео и все функции</button>
+    <button class="store-invite" id="store-ad">▶ Смотреть рекламу · +5⚡</button>
+    <div class="store-sub">ПАЧКИ КРЕДИТОВ ЗА TELEGRAM STARS</div>
+    <div id="store-packs"></div>
+    <button class="store-partner" id="store-partner">★ Партнёрам и бонусам</button>
+  </div>
+</div>
+
+<script>
+/* ================= Telegram + AdsGram ================= */
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if(tg){ try{ tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor("#0B0A14"); tg.setBackgroundColor && tg.setBackgroundColor("#0B0A14"); }catch(e){} }
+
+let adController = null;
+let adInterstitial = null;
+try{ if(window.Adsgram){ adController = window.Adsgram.init({ blockId: "36520" }); } }catch(e){ adController = null; }
+try{ if(window.Adsgram){ adInterstitial = window.Adsgram.init({ blockId: "36521" }); } }catch(e){ adInterstitial = null; }
+
+/* ================= Persistent storage ================= */
+const _mem = {};
+const persist = {
+  get(k,f){ try{ const v=localStorage.getItem(k); return v==null?f:JSON.parse(v); }catch(e){ return (k in _mem)?_mem[k]:f; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ _mem[k]=v; } }
+};
+
+/* ================= Owner + Server config ================= */
+const OWNER_ID   = 976860643;   // твой Telegram ID — безлимитный доступ
+const API_BASE   = "https://halo-backend-production-44c1.up.railway.app"; // Railway backend
+const DEV_OWNER  = false;        // true = включить безлимит при тесте вне Telegram (для отладки)
+const DEV_PRO    = false;        // true = включить PRO при тесте вне Telegram
+const AFFILIATE_URL = "https://bayanchatbot.netlify.app"; // ссылка кнопки «Партнёрам» — подставь свою
+const BOT_USERNAME  = "HALOStudiobot"; // юзернейм бота Mini App (без @) — для реферальной ссылки
+const APP_NAME      = "studio";   // короткое имя Mini App из BotFather (t.me/HALOStudiobot/studio)
+let userPro = false, bonusReady = false, refCount = 0;
+
+const tgUser  = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+const isOwner = DEV_OWNER || (tgUser && tgUser.id === OWNER_ID);
+const serverMode = !!API_BASE && !!(tg && tg.initData);
+
+/* ================= Credits ================= */
+const START_CREDITS = 8, AD_REWARD = 5, COST = { image:1, video:3 };
+let credits = persist.get("halo_credits", START_CREDITS);   // бесплатные (реклама/бонус/рефералы)
+let paidCredits = 0;                                          // купленные за Stars (только сервер)
+function totalCredits(){ return credits + paidCredits; }
+const creditN = document.getElementById("credit-n");
+const creditsPill = document.getElementById("credits");
+
+function renderCredits(){ creditN.textContent = isOwner ? "∞" : totalCredits(); }
+function saveCredits(){ if(!serverMode) persist.set("halo_credits", credits); renderCredits(); }
+function grantCredits(n){ if(isOwner) return; credits += n; saveCredits(); }
+function flashPill(){ creditsPill.classList.remove("flash"); void creditsPill.offsetWidth; creditsPill.classList.add("flash"); }
+function notEnough(){ toast("Не хватает кредитов. Нажми ⚡ чтобы пополнить."); flashPill(); }
+
+async function serverCall(path, body){
+  const res = await fetch(API_BASE + path, { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(Object.assign({ initData: tg.initData }, body||{})) });
+  if(!res.ok) throw new Error("server "+res.status);
+  return res.json();
+}
+async function syncCredits(){
+  if(!serverMode){ renderCredits(); return; }
+  try{
+    const d = await serverCall("/api/credits");
+    if(typeof d.free === "number") credits = d.free;
+    if(typeof d.paid === "number") paidCredits = d.paid;
+    userPro = !!d.pro; bonusReady = !!d.bonus; refCount = d.referrals || 0;
+    isPro = isOwner || DEV_PRO || userPro;
+    refreshPro(); setVideoCostBadge(); updateStoreUI();
+  }catch(e){}
+  renderCredits();
+}
+
+// true if the user currently has enough (owner always true). Cheap pre-check before generating.
+function canAfford(cost){ return isOwner || totalCredits() >= cost; }
+
+// charge on success; returns true if charged (owner = free noop)
+async function spend(n){
+  if(isOwner) return true;
+  if(serverMode){
+    try{ const d = await serverCall("/api/spend", { amount:n });
+      if(typeof d.free === "number") credits = d.free;
+      if(typeof d.paid === "number") paidCredits = d.paid;
+      renderCredits(); return !!d.ok;
+    }catch(e){ /* fall through to local */ }
+  }
+  if(credits < n){ renderCredits(); return false; }
+  credits -= n; saveCredits(); return true;
+}
+
+async function watchAdForCredits(){
+  if(isOwner){ toast("Владелец — безлимитный доступ ∞", true); return; }
+  if(adController){
+    try{
+      await adController.show();          // резолвится только после полного просмотра рекламы
+      if(serverMode){ await syncCredits(); toast(`+${AD_REWARD} кредитов`, true); } // начисление приходит от AdsGram Reward URL на сервер
+      else { grantCredits(AD_REWARD); toast(`+${AD_REWARD} кредитов`, true); }
+    }catch(e){ toast("Реклама не досмотрена — награда не начислена."); }
+  } else {
+    grantCredits(AD_REWARD); toast(`+${AD_REWARD} кредитов (тест)`, true);
+  }
+}
+creditsPill.onclick = watchAdForCredits;
+if(isOwner) creditsPill.title = "Владелец — безлимит ∞";
+
+/* ================= PRO (динамически из сервера) ================= */
+let isPro = isOwner || DEV_PRO;        // обновляется после syncCredits, если куплен PRO
+const proState = { ihd:false, ibatch:false, vhd:false };
+function wirePro(id, key){
+  const b = document.getElementById(id);
+  b.classList.remove("locked"); const lk=b.querySelector(".lk"); if(lk) lk.remove();
+  if(!isPro){ b.classList.add("locked"); b.insertAdjacentHTML("beforeend", ' <span class="lk">🔒</span>'); b.onclick = ()=>{ toast("PRO-функция — оформи PRO за Stars."); flashPill(); }; return; }
+  b.onclick = ()=>{ proState[key] = !proState[key]; b.classList.toggle("on", proState[key]); };
+}
+function refreshPro(){
+  document.getElementById("pro-badge").classList.toggle("on", isPro);
+  wirePro("i-hd","ihd"); wirePro("i-batch","ibatch"); wirePro("v-hd","vhd");
+  document.querySelectorAll("#v-frames option[data-pro]").forEach(o=>o.disabled=!isPro);
+  const vm=document.getElementById("v-mode"); if(vm) vm.style.display = isPro ? "" : "none";
+}
+function scaleDims(dims, on){ if(!on) return dims; const [w,h]=dims.split("x").map(Number); return `${Math.round(w*1.5)}x${Math.round(h*1.5)}`; }
+refreshPro();
+syncCredits();
+
+/* ================= Interstitial ads (block 36521) ================= */
+let genCount = 0;
+const INTERSTITIAL_EVERY = 3;   // показывать после каждой N-й генерации
+function maybeShowInterstitial(){
+  if(isOwner) return;           // владельцу рекламу не показываем
+  if(!adInterstitial) return;   // вне Telegram / SDK не загружен
+  genCount++;
+  if(genCount % INTERSTITIAL_EVERY !== 0) return;
+  try{ adInterstitial.show().catch(()=>{}); }catch(e){}
+}
+
+/* ================= Toast ================= */
+let toastTimer;
+function toast(msg, reward){
+  const el=document.getElementById("toast");
+  el.textContent=msg; el.classList.toggle("reward", !!reward); el.classList.add("on");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("on"), 2600);
+}
+
+/* ================= Styles ================= */
+const STYLES=[
+  ["Фотореализм","photorealistic, ultra detailed, 8k, sharp focus, realistic lighting"],
+  ["Кино","cinematic, dramatic lighting, film grain, anamorphic, shallow depth of field"],
+  ["Аниме","anime style, vibrant, cel shaded, studio quality, detailed"],
+  ["3D-рендер","3D render, octane, subsurface scattering, soft studio lighting, high detail"],
+  ["Мультфильм","3D animated movie style, Pixar-like, cute characters, vibrant colors, family friendly, high detail, cinematic lighting"],
+  ["2D-анимация","2D cartoon animation, flat colors, bold clean outlines, cel shaded, playful, colorful"],
+  ["Киберпанк","cyberpunk, neon lights, futuristic, moody, rain reflections"],
+  ["Фэнтези","epic fantasy, magical, ethereal atmosphere, concept art"],
+  ["Неон","neon glow, synthwave, vibrant magenta and cyan, retro futurism"],
+  ["Минимал","minimalist, clean, simple composition, soft palette, negative space"],
+  ["Мультфильм","3D animated cartoon, Pixar Disney style, colorful, expressive cute characters, soft lighting, high detail"],
+  ["2D-анимация","2D animation, flat cartoon style, bold clean outlines, vibrant colors, hand-drawn look"],
+];
+const state={ image:{styles:new Set(),url:null}, video:{styles:new Set(),frames:[],blob:null}, gallery:persist.get("halo_gallery",[]) };
+function buildChips(id,key){ const c=document.getElementById(id); STYLES.forEach(([label,kw])=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=label; b.onclick=()=>{ const s=state[key].styles; if(s.has(kw)){s.delete(kw);b.classList.remove("on");}else{s.add(kw);b.classList.add("on");} }; c.appendChild(b); }); }
+buildChips("i-styles","image"); buildChips("v-styles","video");
+
+/* ================= Tabs ================= */
+document.querySelectorAll(".tab").forEach(t=>{ t.onclick=()=>{ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active")); document.querySelectorAll(".view").forEach(x=>x.classList.remove("active")); t.classList.add("active"); document.getElementById("view-"+t.dataset.view).classList.add("active"); }; });
+
+function fullPrompt(base,set){ const s=[...set].join(", "); return s?`${base.trim()}, ${s}`:base.trim(); }
+function imgURL(prompt,dims,model,seed){ const [w,h]=dims.split("x"); return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&model=${model}&nologo=true&seed=${seed}`; }
+function showLoading(el,label){ el.innerHTML=`<div class="loading"><div class="scanner"></div><div class="lbl">${label}</div></div>`; }
+function showError(el,msg){ el.innerHTML=`<div class="err">${msg}</div>`; }
+
+/* ================= Claude prompt enhance ================= */
+async function enhance(text){
+  if(serverMode){
+    const d=await serverCall("/api/enhance",{ text });
+    if(d && d.prompt) return d.prompt;
+    throw new Error("enhance");
+  }
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:`Ты — эксперт по промптам для AI-генерации фото и видео. Перепиши идею ниже в один яркий детальный промпт на английском (40-70 слов): конкретный субъект, окружение, освещение, ракурс камеры, настроение, художественный стиль. ВАЖНО: сохрани имена собственные и казахские/национальные слова и детали как есть (при необходимости латинской транслитерацией), а остальное опиши по-английски. Выведи ТОЛЬКО текст промпта — без кавычек и пояснений.\n\nИдея: ${text}`}]})});
+  const data=await res.json();
+  return data.content.filter(i=>i.type==="text").map(i=>i.text).join("").trim();
+}
+function wireEnhance(btnId,taId){ const btn=document.getElementById(btnId),ta=document.getElementById(taId);
+  btn.onclick=async()=>{ const t=ta.value.trim(); if(!t)return; const orig=btn.innerHTML; btn.disabled=true; btn.textContent="Улучшаю…";
+    try{ ta.value=await enhance(t); }catch(e){ btn.textContent="Не вышло, попробуй ещё"; setTimeout(()=>btn.innerHTML=orig,1600); btn.disabled=false; return; } btn.innerHTML=orig; btn.disabled=false; }; }
+wireEnhance("i-enhance","i-prompt"); wireEnhance("v-enhance","v-prompt");
+
+/* ================= Image ================= */
+const iCanvas=document.getElementById("i-canvas"),iDownload=document.getElementById("i-download"),iVariant=document.getElementById("i-variant");
+async function generateImage(seed){
+  const base=document.getElementById("i-prompt").value.trim();
+  if(!base){document.getElementById("i-prompt").focus();return;}
+  if(!canAfford(COST.image)){ notEnough(); return; }
+  const dims=scaleDims(document.getElementById("i-ratio").value, proState.ihd), model=document.getElementById("i-model").value;
+  const prompt=fullPrompt(base,state.image.styles);
+  const go=document.getElementById("i-go"); go.disabled=true; iDownload.disabled=true; iVariant.disabled=true;
+
+  if(proState.ibatch){
+    showLoading(iCanvas,"Создаю 4 изображения…");
+    const seeds=[seed, seed+11, seed+22, seed+33];
+    try{
+      const imgs=await Promise.all(seeds.map(s=>loadImg(imgURL(prompt,dims,model,s))));
+      iCanvas.innerHTML='<div class="batch-grid"></div>';
+      const grid=iCanvas.querySelector(".batch-grid");
+      imgs.forEach((im,k)=>{ const u=imgURL(prompt,dims,model,seeds[k]); im.title="Скачать"; im.onclick=()=>downloadImage(u,`halo-${Date.now()}-${k}.jpg`); grid.appendChild(im); addToGallery(u,prompt); });
+      state.image.url=imgURL(prompt,dims,model,seeds[0]);
+      iDownload.disabled=false; iVariant.disabled=false; go.disabled=false; await spend(COST.image); maybeShowInterstitial();
+    }catch(e){ showError(iCanvas,"Не удалось создать изображения. Кредит не списан."); go.disabled=false; }
+    return;
+  }
+
+  showLoading(iCanvas,"Создаю изображение…");
+  const url=imgURL(prompt,dims,model,seed);
+  const img=new Image(); img.crossOrigin="anonymous";
+  img.onload=async()=>{ iCanvas.innerHTML=""; iCanvas.appendChild(img); state.image.url=url; iDownload.disabled=false; iVariant.disabled=false; go.disabled=false; await spend(COST.image); addToGallery(url,prompt); maybeShowInterstitial(); };
+  img.onerror=()=>{ showError(iCanvas,"Не удалось загрузить изображение. Попробуй ещё раз — кредит не списан."); go.disabled=false; };
+  img.src=url;
+}
+document.getElementById("i-go").onclick=()=>generateImage(Math.floor(Math.random()*1e6));
+iVariant.onclick=()=>generateImage(Math.floor(Math.random()*1e6));
+async function downloadURL(url,name){ try{ const r=await fetch(url); const b=await r.blob(); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }catch(e){ window.open(url,"_blank"); } }
+function drawWatermark(ctx,w,h){
+  const pad=Math.round(Math.min(w,h)*0.032);
+  const fs=Math.max(16,Math.round(Math.min(w,h)*0.05));
+  ctx.save();
+  ctx.font=`700 ${fs}px 'Space Grotesk', system-ui, sans-serif`;
+  ctx.textBaseline="alphabetic";
+  const text="HALO";
+  const tw=ctx.measureText(text).width;
+  const x=w-tw-pad, y=h-pad;
+  ctx.globalAlpha=0.92;
+  ctx.shadowColor="rgba(0,0,0,.55)"; ctx.shadowBlur=fs*0.35; ctx.shadowOffsetY=1;
+  const g=ctx.createLinearGradient(x,0,x+tw,0);
+  g.addColorStop(0,"#C084FC"); g.addColorStop(.5,"#F472B6"); g.addColorStop(1,"#5EEAF2");
+  ctx.fillStyle=g;
+  ctx.fillText(text,x,y);
+  ctx.restore();
+}
+function isClean(){ return isOwner || isPro; }   // чистый файл — PRO/владельцу
+async function downloadImage(url,name){
+  if(isClean()) return downloadURL(url,name);
+  try{
+    const im=await loadImg(url);
+    const w=im.naturalWidth||im.width, h=im.naturalHeight||im.height;
+    const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+    const ctx=cv.getContext("2d"); ctx.drawImage(im,0,0); drawWatermark(ctx,w,h);
+    cv.toBlob(b=>{ if(!b){ downloadURL(url,name); return; } const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }, "image/jpeg", 0.92);
+  }catch(e){ downloadURL(url,name); }
+}
+iDownload.onclick=()=>{ if(state.image.url) downloadImage(state.image.url,`halo-${Date.now()}.jpg`); };
+
+/* ================= Gallery (persistent) ================= */
+function addToGallery(url,prompt){ state.gallery.unshift({url,prompt}); if(state.gallery.length>30) state.gallery.length=30; persist.set("halo_gallery",state.gallery); renderGallery(); }
+function plural(n){const a=[2,0,1,1,1,2][(n%100>4&&n%100<20)?2:Math.min(n%10,5)];return["работа","работы","работ"][a];}
+function renderGallery(){
+  document.getElementById("gal-count").textContent=state.gallery.length+" "+plural(state.gallery.length);
+  const body=document.getElementById("gal-body");
+  if(!state.gallery.length){body.innerHTML=`<div class="gal-empty">Пока пусто. Сгенерируй что-нибудь — оно сохранится здесь.</div>`;return;}
+  body.innerHTML=`<div class="gal-grid">`+state.gallery.map((g,i)=>`<div class="gal-item" title="${(g.prompt||'').replace(/"/g,'&quot;')}"><img src="${g.url}" loading="lazy" alt=""><div class="dl" data-i="${i}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></div></div>`).join("")+`</div>`;
+  body.querySelectorAll(".dl").forEach(el=>{ el.onclick=e=>{e.stopPropagation(); downloadImage(state.gallery[el.dataset.i].url,`halo-${Date.now()}.jpg`);}; });
+}
+renderGallery();
+
+/* ================= Templates ================= */
+const TEMPLATES=[
+  {name:"YouTube-превью",emo:"🎬",desc:"Яркая обложка 16:9",target:"image",ratio:"1280x720",styles:["Кино"],prompt:"eye-catching youtube thumbnail, bold dramatic subject, high contrast, vivid saturated colors, intense facial expression, cinematic lighting, professional, empty space for title text"},
+  {name:"Аватар",emo:"🧑‍🎨",desc:"Профильное фото 1:1",target:"image",ratio:"1024x1024",styles:["3D-рендер"],prompt:"stylized 3D character avatar portrait, friendly confident expression, clean gradient studio background, soft lighting, high detail, profile picture"},
+  {name:"Логотип",emo:"✳️",desc:"Минимал-лого 1:1",target:"image",ratio:"1024x1024",styles:["Минимал"],prompt:"modern minimalist logo, simple geometric emblem, flat vector design, single accent color, clean white background, brand mark"},
+  {name:"Товар на белом",emo:"📦",desc:"Предметка 1:1",target:"image",ratio:"1024x1024",styles:["Фотореализм"],prompt:"professional product photography, single product centered on clean white background, soft studio lighting, sharp focus, commercial catalog quality"},
+  {name:"Неон-постер",emo:"🌆",desc:"Вертикаль 9:16",target:"image",ratio:"720x1280",styles:["Неон","Киберпанк"],prompt:"vertical neon poster, glowing magenta and cyan lights, futuristic night city, rain reflections, dramatic cinematic atmosphere"},
+  {name:"Портрет",emo:"📸",desc:"Кинопортрет 9:16",target:"image",ratio:"720x1280",styles:["Кино","Фотореализм"],prompt:"cinematic portrait of a person, shallow depth of field, soft rim light, moody atmosphere, detailed realistic skin, 85mm lens bokeh"},
+  {name:"Фэнтези-арт",emo:"🐉",desc:"Эпик 16:9",target:"image",ratio:"1280x720",styles:["Фэнтези"],prompt:"epic fantasy landscape, magical glowing atmosphere, dramatic sky, distant castle on cliffs, concept art, highly detailed"},
+  {name:"Фуд-фото",emo:"🍜",desc:"Еда 1:1",target:"image",ratio:"1024x1024",styles:["Фотореализм"],prompt:"appetizing food photography, delicious dish close-up, natural window light, shallow depth of field, rising steam, magazine restaurant quality"},
+  {name:"Аниме-герой",emo:"🎌",desc:"Персонаж 9:16",target:"image",ratio:"720x1280",styles:["Аниме"],prompt:"anime character full body, dynamic action pose, vibrant colors, detailed background, studio quality cel shading"},
+  {name:"Абстракция",emo:"🌀",desc:"Фон 16:9",target:"image",ratio:"1280x720",styles:["Минимал"],prompt:"abstract gradient background, smooth flowing organic shapes, soft pastel and neon blend, minimal, desktop wallpaper, high resolution"},
+  {name:"Стикер",emo:"🩷",desc:"Стикер 1:1",target:"image",ratio:"1024x1024",styles:["3D-рендер"],prompt:"cute die-cut sticker, bold thick white outline, glossy, simple flat background, kawaii character, high contrast, sticker design"},
+  {name:"Мем",emo:"😂",desc:"Мем-фон 4:3",target:"image",ratio:"1024x768",styles:["Фотореализм"],prompt:"funny meme scene, expressive exaggerated situation, bright clear composition, empty space at top and bottom for caption text"},
+  {name:"Обложка канала",emo:"📣",desc:"Telegram 1:1",target:"image",ratio:"1024x1024",styles:["Кино","Неон"],prompt:"bold telegram channel cover art, striking central icon, vibrant gradient background, modern branding, clean and memorable"},
+  {name:"Мультгерой",emo:"🧸",desc:"3D-мультик 1:1",target:"image",ratio:"1024x1024",styles:["Мультфильм"],prompt:"cute 3D animated cartoon character, big expressive eyes, friendly smile, soft studio lighting, colorful, Pixar-like, high detail"},
+  {name:"2D-персонаж",emo:"🎨",desc:"2D-мультик 9:16",target:"image",ratio:"720x1280",styles:["2D-анимация"],prompt:"2D cartoon character full body, bold clean outlines, flat vibrant colors, playful pose, simple background"},
+  {name:"Мультклип",emo:"📺",desc:"Мультик-видео",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"animated cartoon scene, cute characters, lively motion, colorful magical world, Pixar-style 3D animation"},
+  {name:"Мультфильм-кадр",emo:"🎨",desc:"Кадр 16:9",target:"image",ratio:"1280x720",styles:["Мультфильм"],prompt:"cartoon movie still, cute expressive character, colorful whimsical scene, cinematic lighting, Pixar Disney 3D style, high detail"},
+  {name:"2D-персонаж",emo:"✏️",desc:"Герой 9:16",target:"image",ratio:"720x1280",styles:["2D-анимация"],prompt:"2D animated cartoon character, full body, dynamic playful pose, bold clean outlines, vibrant flat colors"},
+  {name:"Мультклип",emo:"🎞️",desc:"Видео-сцена",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"animated cartoon scene, cute characters moving, colorful lively environment, Pixar 3D style, smooth playful motion"},
+  {name:"Кибер-клип",emo:"🎥",desc:"Видео-сцена",target:"video",ratio:"1280x720",styles:["Киберпанк","Неон"],prompt:"neon cyberpunk city at night, heavy rain, flying cars, moving through glowing wet streets, atmospheric fog"},
+  {name:"Реклама товара",emo:"✨",desc:"Видео-ролик",target:"video",ratio:"720x1280",styles:["Кино","Фотореализм"],prompt:"cinematic product reveal, elegant slowly rotating showcase, soft premium studio lighting, dramatic reflections, luxury commercial"},
+];
+function switchTab(name){ const t=document.querySelector(`.tab[data-view="${name}"]`); if(t) t.click(); }
+function setSelect(id,val){ const s=document.getElementById(id); if(s && [...s.options].some(o=>o.value===val)) s.value=val; }
+function setStyleByLabels(containerId,key,labels){
+  const set=state[key].styles; set.clear();
+  document.querySelectorAll(`#${containerId} .chip`).forEach(b=>b.classList.remove("on"));
+  (labels||[]).forEach(lbl=>{
+    const entry=STYLES.find(s=>s[0]===lbl); if(!entry) return; set.add(entry[1]);
+    const btn=[...document.querySelectorAll(`#${containerId} .chip`)].find(b=>b.textContent===lbl);
+    if(btn) btn.classList.add("on");
+  });
+}
+function applyTemplate(t){
+  const target=t.target||"image";
+  switchTab(target);
+  if(target==="video"){ document.getElementById("v-prompt").value=t.prompt; setSelect("v-ratio",t.ratio); setStyleByLabels("v-styles","video",t.styles); }
+  else { document.getElementById("i-prompt").value=t.prompt; setSelect("i-ratio",t.ratio); setStyleByLabels("i-styles","image",t.styles); }
+  toast(`Шаблон «${t.name}» загружен`, true);
+}
+let customTpl = persist.get("halo_templates", []);
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function tplCard(t,i,custom){
+  return `<div class="tpl-card" data-i="${i}" data-custom="${custom?1:0}"><span class="tpl-tag">${t.target==="video"?"видео":"фото"}</span>${custom?`<button class="tpl-del" data-id="${t.id}">×</button>`:""}<div class="emo">${t.emo}</div><div class="tn">${escapeHtml(t.name)}</div><div class="td">${escapeHtml(t.desc||"")}</div></div>`;
+}
+function renderTemplates(){
+  const g=document.getElementById("tpl-grid");
+  let html=`<div class="tpl-grid">`+TEMPLATES.map((t,i)=>tplCard(t,i,false)).join("")+`</div>`;
+  if(customTpl.length){ html+=`<div class="tpl-sub">Мои шаблоны</div><div class="tpl-grid">`+customTpl.map((t,i)=>tplCard(t,i,true)).join("")+`</div>`; }
+  g.innerHTML=html;
+  g.querySelectorAll(".tpl-card").forEach(c=>c.onclick=e=>{ if(e.target.classList.contains("tpl-del"))return; const cu=c.dataset.custom==="1"; applyTemplate(cu?customTpl[c.dataset.i]:TEMPLATES[c.dataset.i]); });
+  g.querySelectorAll(".tpl-del").forEach(b=>b.onclick=e=>{ e.stopPropagation(); deleteTemplate(b.dataset.id); });
+}
+function activeStyleLabels(key){ return [...state[key].styles].map(kw=>{ const e=STYLES.find(s=>s[1]===kw); return e?e[0]:null; }).filter(Boolean); }
+function saveTemplate(target){
+  const ta=document.getElementById(target==="video"?"v-prompt":"i-prompt");
+  const prompt=ta.value.trim();
+  if(!prompt){ toast("Сначала введите промпт"); ta.focus(); return; }
+  const ratio=document.getElementById(target==="video"?"v-ratio":"i-ratio").value;
+  const styles=activeStyleLabels(target==="video"?"video":"image");
+  const name=(prompt.split(/\s+/).slice(0,4).join(" ").slice(0,32))||"Мой шаблон";
+  customTpl.unshift({ id:"t"+Date.now(), name, emo:"⭐", desc:"мой шаблон", target, ratio, styles, prompt });
+  if(customTpl.length>40) customTpl.length=40;
+  persist.set("halo_templates", customTpl); renderTemplates();
+  toast("Сохранён во вкладку «Шаблоны»", true);
+}
+function deleteTemplate(id){ customTpl=customTpl.filter(t=>t.id!==id); persist.set("halo_templates", customTpl); renderTemplates(); }
+document.getElementById("i-save").onclick=()=>saveTemplate("image");
+document.getElementById("v-save").onclick=()=>saveTemplate("video");
+renderTemplates();
+
+/* ================= Video ================= */
+const vCanvasWrap=document.getElementById("v-canvas"),vStatus=document.getElementById("v-status"),vDownload=document.getElementById("v-download"),vReplay=document.getElementById("v-replay");
+function loadImg(url){ return new Promise((res,rej)=>{ const im=new Image(); im.crossOrigin="anonymous"; im.onload=()=>res(im); im.onerror=rej; im.src=url; }); }
+async function buildVideo(){
+  const base=document.getElementById("v-prompt").value.trim();
+  if(!base){document.getElementById("v-prompt").focus();return;}
+  if(!canAfford(COST.video)){ notEnough(); return; }
+  const dims=scaleDims(document.getElementById("v-ratio").value, proState.vhd), nFrames=parseInt(document.getElementById("v-frames").value);
+  const prompt=fullPrompt(base,state.video.styles); const [W,H]=dims.split("x").map(Number);
+  const go=document.getElementById("v-go"); go.disabled=true; vDownload.disabled=true; vReplay.disabled=true;
+  document.getElementById("v-mp4").style.display="none"; state.video.aiUrl=null;
+  vStatus.innerHTML=`<span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>рендер`;
+  const angles=["wide establishing shot","medium shot moving closer","detailed close-up","dynamic low angle","sweeping aerial view","dramatic side view","reverse angle","final hero shot"];
+  const frames=[];
+  for(let i=0;i<nFrames;i++){
+    showLoading(vCanvasWrap,`Кадр ${i+1} из ${nFrames}…`);
+    const fp=`${prompt}, ${angles[i%angles.length]}, consistent scene`;
+    try{ frames.push(await loadImg(imgURL(fp,dims,"flux",1000+i*37))); }
+    catch(e){ showError(vCanvasWrap,"Не удалось создать кадры. Попробуй ещё раз — кредиты не списаны."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return; }
+  }
+  state.video.frames=frames;
+  await spend(COST.video);
+  const cv=document.createElement("canvas"); const scale=Math.min(1,900/W); cv.width=Math.round(W*scale); cv.height=Math.round(H*scale);
+  vCanvasWrap.innerHTML=""; vCanvasWrap.appendChild(cv); const ctx=cv.getContext("2d");
+  let recorder=null, chunks=[];
+  try{
+    const stream=cv.captureStream(30);
+    const mp4=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/mp4;codecs=avc1.42E01E","video/mp4"];
+    const webm=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
+    let mime=null, ext="webm";
+    for(const t of mp4){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(t)){ mime=t; ext="mp4"; break; } }
+    if(!mime) for(const t of webm){ if(MediaRecorder.isTypeSupported(t)){ mime=t; break; } }
+    state.video.ext=ext; state.video.mime=mime||"video/webm";
+    recorder=new MediaRecorder(stream, mime?{mimeType:mime,videoBitsPerSecond:isPro?10000000:6000000}:{});
+    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+    recorder.onstop=()=>{ state.video.blob=new Blob(chunks,{type:state.video.mime}); vDownload.disabled=false; updateMp4Btn(); };
+    recorder.start();
+  }catch(e){ recorder=null; }
+  await playSequence(ctx,cv,frames,()=>{ if(recorder&&recorder.state==="recording") recorder.stop(); });
+  go.disabled=false; vReplay.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; maybeShowInterstitial();
+}
+function playSequence(ctx,cv,frames,onDone){
+  return new Promise(resolve=>{
+    const W=cv.width,H=cv.height,HOLD=1100,FADE=520,total=frames.length;
+    const moves=frames.map((_,i)=>({z0:1.06,z1:1.16,dx:(i%2?1:-1)*0.05,dy:(i%3?-1:1)*0.04}));
+    const start=performance.now(),perFrame=HOLD;
+    function drawFrame(img,mv,p,alpha){ const z=mv.z0+(mv.z1-mv.z0)*p; const iw=img.width,ih=img.height,cr=W/H,ir=iw/ih; let sw,sh; if(ir>cr){sh=ih;sw=ih*cr;}else{sw=iw;sh=iw/cr;} sw/=z;sh/=z; let sx=(iw-sw)/2+mv.dx*sw*p, sy=(ih-sh)/2+mv.dy*sh*p; sx=Math.max(0,Math.min(iw-sw,sx)); sy=Math.max(0,Math.min(ih-sh,sy)); ctx.globalAlpha=alpha; ctx.drawImage(img,sx,sy,sw,sh,0,0,W,H); }
+    const wm = !(isOwner || isPro);   // водяной знак на бесплатных клипах
+    function loop(now){ const t=now-start, idx=Math.floor(t/perFrame);
+      if(idx>=total){ ctx.globalAlpha=1; drawFrame(frames[total-1],moves[total-1],1,1); if(wm) drawWatermark(ctx,W,H); setTimeout(()=>{onDone&&onDone();resolve();},250); return; }
+      const local=t-idx*perFrame,p=local/perFrame;
+      ctx.globalAlpha=1; ctx.fillStyle="#0B0A14"; ctx.fillRect(0,0,W,H);
+      drawFrame(frames[idx],moves[idx],p,1);
+      if(local>perFrame-FADE&&idx+1<total){ const fp=(local-(perFrame-FADE))/FADE; drawFrame(frames[idx+1],moves[idx+1],0,fp); }
+      if(wm) drawWatermark(ctx,W,H);
+      ctx.globalAlpha=1; requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  });
+}
+document.getElementById("v-go").onclick=()=>{ if(videoMode==="ai") buildAIVideo(); else buildVideo(); };
+vReplay.onclick=()=>{ if(!state.video.frames.length)return; const cv=vCanvasWrap.querySelector("canvas"); if(cv){ playSequence(cv.getContext("2d"),cv,state.video.frames,null); } };
+vDownload.onclick=()=>{
+  if(state.video.aiUrl){ downloadURL(state.video.aiUrl,`halo-clip-${Date.now()}.mp4`); return; }
+  if(!state.video.blob)return; const u=URL.createObjectURL(state.video.blob); const a=document.createElement("a"); a.href=u; a.download=`halo-clip-${Date.now()}.${state.video.ext||"webm"}`; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000);
+};
+
+/* ---- Video mode toggle (slideshow / AI) ---- */
+let videoMode="slideshow";
+document.querySelectorAll("#v-mode .seg-btn").forEach(b=>{
+  b.onclick=()=>{
+    if(b.dataset.mode==="ai" && !isPro){ toast("AI-видео — функция PRO."); flashPill(); return; }
+    document.querySelectorAll("#v-mode .seg-btn").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); videoMode=b.dataset.mode;
+    document.getElementById("v-ai-opts").style.display = videoMode==="ai" ? "" : "none";
+    document.getElementById("v-frames-cell").style.display = videoMode==="ai" ? "none" : "";
+    document.getElementById("v-hd-wrap").style.display = videoMode==="ai" ? "none" : "";
+    setVideoCostBadge();
+  };
+});
+const aiAudioBtn=document.getElementById("v-aiaudio");
+aiAudioBtn.onclick=()=>{ const on=!aiAudioBtn.classList.contains("on"); aiAudioBtn.classList.toggle("on",on); aiAudioBtn.textContent=on?"Звук вкл":"Звук выкл"; };
+const AI_COST = { veo3:15, kling:10, seedance:10 };
+function aiCost(){ return AI_COST[document.getElementById("v-aimodel").value] || 10; }
+function setVideoCostBadge(){
+  const c=document.querySelector("#v-go .cost"); if(!c) return;
+  if(isOwner){ c.textContent="· ∞"; return; }
+  c.textContent = videoMode==="ai" ? ("· "+aiCost()+"⚡") : "· 3⚡";
+}
+function updateAiControls(){
+  const model=document.getElementById("v-aimodel").value;
+  const dur=document.getElementById("v-aidur");
+  const opts = model==="veo3" ? [[4,"4 секунды"],[6,"6 секунд"],[8,"8 секунд"]] : [[5,"5 секунд"],[10,"10 секунд"]];
+  const def  = model==="veo3" ? 8 : 5;
+  dur.innerHTML=opts.map(([v,l])=>`<option value="${v}"${v===def?" selected":""}>${l}</option>`).join("");
+  document.getElementById("v-audio-row").style.display = model==="veo3" ? "" : "none";
+  setVideoCostBadge();
+}
+document.getElementById("v-aimodel").onchange=updateAiControls;
+updateAiControls();
+{ const ic=document.querySelector("#i-go .cost"); if(ic) ic.textContent = isOwner ? "· ∞" : "· 1⚡"; }
+setVideoCostBadge();
+
+/* ---- Real generative video via backend (Replicate/Kling/etc.) ---- */
+async function buildAIVideo(){
+  const base=document.getElementById("v-prompt").value.trim();
+  if(!base){document.getElementById("v-prompt").focus();return;}
+  if(!serverMode){ toast("AI-видео требует подключённый сервер и видео-API (задай API_BASE)."); return; }
+  const prompt=fullPrompt(base,state.video.styles);
+  const aiModel=document.getElementById("v-aimodel").value;
+  const aspect=ratioToAspect(document.getElementById("v-ratio").value);
+  const dur=parseInt(document.getElementById("v-aidur").value);
+  const audio=document.getElementById("v-aiaudio").classList.contains("on");
+  if(!isOwner && paidCredits < aiCost()){ toast("AI-видео — только за купленные кредиты 💎. Пополни в магазине."); openStore(); return; }
+  const go=document.getElementById("v-go"); go.disabled=true; vDownload.disabled=true; vReplay.disabled=true;
+  document.getElementById("v-mp4").style.display="none"; state.video.aiUrl=null; state.video.blob=null;
+  vStatus.innerHTML=`<span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>AI-рендер`;
+  showLoading(vCanvasWrap,"Генерирую AI-видео… это до минуты");
+  try{
+    const d=await serverCall("/api/video/generate",{prompt, model:aiModel, aspect, duration:dur, audio});
+    if(!d.ok){
+      if(d.error==="pro_required"){ showError(vCanvasWrap,"AI-видео доступно только в PRO."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; openStore(); return; }
+      if(d.error==="need_paid"){ if(typeof d.paid==="number"){paidCredits=d.paid;renderCredits();} showError(vCanvasWrap,"AI-видео — только за купленные кредиты 💎."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; openStore(); return; }
+      if(typeof d.credits==="number"){credits=d.credits;renderCredits();} showError(vCanvasWrap,"Не хватает кредитов для AI-видео."); notEnough(); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return;
+    }
+    await syncCredits();
+    const url=await pollVideo(d.id);
+    if(!url){ showError(vCanvasWrap,"Видео не готово — попробуй ещё раз."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return; }
+    vCanvasWrap.innerHTML="";
+    const v=document.createElement("video"); v.src=url; v.controls=true; v.autoplay=true; v.loop=true; v.playsInline=true;
+    vCanvasWrap.appendChild(v);
+    state.video.aiUrl=url; state.video.ext="mp4";
+    vDownload.disabled=false; go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; maybeShowInterstitial();
+  }catch(e){ showError(vCanvasWrap,"Ошибка AI-видео. Проверь сервер и API-ключ провайдера."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; }
+}
+function ratioToAspect(dims){ const [w,h]=dims.split("x").map(Number); return w>h?"16:9":(h>w?"9:16":"1:1"); }
+async function pollVideo(id){
+  for(let i=0;i<80;i++){
+    await new Promise(r=>setTimeout(r,3000));
+    let d; try{ d=await serverCall("/api/video/status",{id}); }catch(e){ continue; }
+    if(d.status==="succeeded" && d.url) return d.url;
+    if(["failed","canceled","error"].includes(d.status)) return null;
+  }
+  return null;
+}
+
+/* MP4 button: shown only when clip recorded as WebM and user is PRO (native MP4 not available) */
+const vMp4=document.getElementById("v-mp4");
+function updateMp4Btn(){ if(isPro && state.video.ext==="webm" && state.video.blob){ vMp4.style.display=""; vMp4.disabled=false; } else { vMp4.style.display="none"; } }
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+let ffmpegInst=null;
+async function getFfmpeg(){
+  if(ffmpegInst) return ffmpegInst;
+  await loadScript("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js");
+  await loadScript("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js");
+  const { FFmpeg }=window.FFmpegWASM; const { toBlobURL }=window.FFmpegUtil;
+  const ff=new FFmpeg(); const core="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
+  await ff.load({ coreURL: await toBlobURL(`${core}/ffmpeg-core.js`,"text/javascript"), wasmURL: await toBlobURL(`${core}/ffmpeg-core.wasm`,"application/wasm") });
+  ffmpegInst=ff; return ff;
+}
+vMp4.onclick=async()=>{
+  if(!state.video.blob)return;
+  const orig=vMp4.innerHTML; vMp4.disabled=true; vMp4.textContent="Конвертирую…";
+  try{
+    const ff=await getFfmpeg(); const { fetchFile }=window.FFmpegUtil;
+    await ff.writeFile("in.webm", await fetchFile(state.video.blob));
+    await ff.exec(["-i","in.webm","-c:v","libx264","-preset","veryfast","-pix_fmt","yuv420p","-movflags","+faststart","out.mp4"]);
+    const data=await ff.readFile("out.mp4");
+    const mp4=new Blob([data.buffer],{type:"video/mp4"});
+    const u=URL.createObjectURL(mp4); const a=document.createElement("a"); a.href=u; a.download=`halo-clip-${Date.now()}.mp4`; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000);
+    toast("MP4 готов", true);
+  }catch(e){ toast("MP4-конвертация недоступна в этом окружении — сохрани WebM."); }
+  vMp4.innerHTML=orig; vMp4.disabled=false;
+};
+/* ================= Store · Partner · Telegram Stars ================= */
+function openLink(url){ try{ if(tg && tg.openLink){ tg.openLink(url); return; } }catch(e){} window.open(url,"_blank"); }
+document.getElementById("partner-btn").onclick=()=>openLink(AFFILIATE_URL);
+document.getElementById("store-partner").onclick=()=>openLink(AFFILIATE_URL);
+
+const CREDIT_PACKS = [ {credits:60,stars:50}, {credits:200,stars:150}, {credits:600,stars:400} ];
+function renderPacks(){
+  const el=document.getElementById("store-packs");
+  el.innerHTML=CREDIT_PACKS.map((p,i)=>`<button class="pack" data-i="${i}"><span class="pc">${p.credits}⚡</span><span class="pp">${p.stars} ★ Stars</span></button>`).join("");
+  el.querySelectorAll(".pack").forEach(b=>b.onclick=()=>buyPack(Number(b.dataset.i)));
+}
+function openStore(){ renderPacks(); updateStoreUI(); document.getElementById("store").classList.add("on"); }
+function closeStore(){ document.getElementById("store").classList.remove("on"); }
+document.getElementById("store-close").onclick=closeStore;
+document.getElementById("store").onclick=(e)=>{ if(e.target.id==="store") closeStore(); };
+document.getElementById("store-ad").onclick=()=>{ closeStore(); watchAdForCredits(); };
+
+function updateStoreUI(){
+  const bal=document.getElementById("store-bal");
+  if(bal){ bal.style.display = isOwner ? "none" : ""; bal.innerHTML = `Бесплатные: <b>${credits}⚡</b> · Купленные: <b>${paidCredits}💎</b>`; }
+  const proBtn=document.getElementById("store-pro");
+  if(proBtn) proBtn.style.display = (isOwner||isPro) ? "none" : "";
+  const bonusBtn=document.getElementById("store-bonus");
+  if(bonusBtn){
+    if(isOwner){ bonusBtn.style.display="none"; }
+    else { bonusBtn.style.display=""; bonusBtn.disabled=!bonusReady; bonusBtn.textContent = bonusReady ? "🎁 Ежедневный бонус · +5⚡" : "🎁 Бонус получен — приходи завтра"; }
+  }
+  const inv=document.getElementById("store-invite");
+  if(inv) inv.textContent = refCount ? `👥 Пригласить друга · +20⚡ (друзей: ${refCount})` : "👥 Пригласить друга · +20⚡";
+}
+function refLink(){ return `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=ref_${tgUser?tgUser.id:""}`; }
+document.getElementById("store-invite").onclick=()=>{
+  const link=refLink(), text="Заходи в HALO AI Studio — генерируй фото и видео!";
+  openLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
+};
+document.getElementById("store-bonus").onclick=async()=>{
+  if(!serverMode){ toast("Бонус работает в Telegram с подключённым сервером."); return; }
+  try{ const d=await serverCall("/api/bonus/claim"); if(d.ok){ toast("Бонус получен!", true); await syncCredits(); updateStoreUI(); } else { toast("Бонус уже получен сегодня."); } }
+  catch(e){ toast("Не удалось получить бонус."); }
+};
+document.getElementById("store-pro").onclick=()=>buyPro();
+async function buyPro(){
+  if(!serverMode){ toast("PRO работает в Telegram с подключённым сервером."); return; }
+  if(!(tg && tg.openInvoice)){ toast("Оплата доступна в приложении Telegram."); return; }
+  try{
+    const d=await serverCall("/api/pay/invoice",{ kind:"pro" });
+    if(!d.ok || !d.link){ toast("Не удалось создать счёт."); return; }
+    tg.openInvoice(d.link,(status)=>{
+      if(status==="paid"){ toast("PRO активирован! 🎉", true); closeStore(); setTimeout(syncCredits,1500); setTimeout(syncCredits,4000); }
+      else if(status==="failed"){ toast("Оплата не прошла."); }
+    });
+  }catch(e){ toast("Ошибка оплаты."); }
+}
+async function buyPack(i){
+  if(!serverMode){ toast("Покупка работает в Telegram с подключённым сервером."); return; }
+  if(!(tg && tg.openInvoice)){ toast("Оплата доступна в приложении Telegram."); return; }
+  try{
+    const d=await serverCall("/api/pay/invoice",{ kind:"pack", pack:i });
+    if(!d.ok || !d.link){ toast("Не удалось создать счёт."); return; }
+    tg.openInvoice(d.link,(status)=>{
+      if(status==="paid"){ toast("Оплата принята, начисляю кредиты…", true); closeStore(); setTimeout(syncCredits,1500); setTimeout(syncCredits,4000); }
+      else if(status==="failed"){ toast("Оплата не прошла."); }
+    });
+  }catch(e){ toast("Ошибка оплаты."); }
+}
+
+// клик по балансу: владелец → ∞, остальные → магазин
+creditsPill.onclick = ()=>{ if(isOwner){ toast("Владелец — безлимитный доступ ∞", true); return; } openStore(); };
+
+// Реферал при первом заходе по ссылке ?startapp=ref_<id>
+(function initReferral(){
+  try{
+    const sp = tg && tg.initDataUnsafe ? tg.initDataUnsafe.start_param : null;
+    if(sp && /^ref_\d+$/.test(sp) && serverMode){
+      const ref=Number(sp.slice(4));
+      if(ref && (!tgUser || ref!==tgUser.id)){
+        serverCall("/api/referral",{ ref }).then(d=>{ if(d.ok){ toast("Бонус за приглашение начислен!", true); syncCredits(); } }).catch(()=>{});
+      }
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

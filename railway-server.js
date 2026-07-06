@@ -19,6 +19,9 @@
 import express from "express";
 import crypto from "crypto";
 import Database from "better-sqlite3";
+import path from "path";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BOT_TOKEN      = process.env.BOT_TOKEN || "";
 const OWNER_ID       = Number(process.env.OWNER_ID || 976860643);
@@ -231,7 +234,10 @@ app.get("/api/adsgram/reward", (req, res) => {
   res.sendStatus(200); // AdsGram ждёт 200 OK
 });
 
-app.get("/", (_req, res) => res.type("text").send("HALO credits backend · OK"));
+// Отдаём само приложение с этого же сервера (Railway открывается без VPN)
+app.get(["/app", "/studio"], (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "index.html")));
+app.get("/health", (_req, res) => res.type("text").send("HALO credits backend · OK"));
 
 // ---------- Генеративное видео (Replicate) ----------
 // Списывает VIDEO_COST кредитов (владельцу бесплатно), создаёт задачу у провайдера,
