@@ -34,6 +34,8 @@ const REF_BONUS      = Number(process.env.REF_BONUS || 20);      // пригла
 const REF_BONUS_NEW  = Number(process.env.REF_BONUS_NEW || 10);  // новичку по приглашению
 const PRO_DAYS       = Number(process.env.PRO_DAYS || 30);       // длительность PRO за одну покупку
 const PRO_STARS      = Number(process.env.PRO_STARS || 250);     // цена PRO в Telegram Stars
+const GROQ_API_KEY   = process.env.GROQ_API_KEY || "";           // ключ Groq для улучшения промптов
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";         // ключ Google Gemini (основной, с фолбэком на Groq)
 
 // --- Видео-API (генеративное видео) ---
 const REPLICATE_TOKEN = process.env.REPLICATE_TOKEN || "";        // ключ Replicate (r8_...)
@@ -359,6 +361,45 @@ app.post("/api/telegram/webhook", async (req, res) => {
     }
   } catch (e) { /* глотаем, чтобы Telegram не ретраил бесконечно */ }
   res.sendStatus(200);
+});
+
+// Улучшение промпта: сначала Gemini, если не вышло — Groq. Оба на сервере, работают без VPN.
+const ENHANCE_PROMPT = (text) => `Ты — эксперт по промптам для AI-генерации фото и видео. Перепиши идею в один яркий детальный промпт на английском (40-70 слов): конкретный субъект, окружение, освещение, ракурс камеры, настроение, художественный стиль. Сохрани имена собственные и казахские/национальные слова и детали как есть (при необходимости латинской транслитерацией). Выведи ТОЛЬКО текст промпта — без кавычек и пояснений.\n\nИдея: ${text}`;
+
+async function enhanceGemini(text){
+  if (!GEMINI_API_KEY) return null;
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: ENHANCE_PROMPT(text) }] }], generationConfig: { temperature: 0.8, maxOutputTokens: 300 } })
+    });
+    const d = await r.json();
+    const out = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return out ? out.trim() : null;
+  } catch (e) { return null; }
+}
+async function enhanceGroq(text){
+  if (!GROQ_API_KEY) return null;
+  try {
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST", headers: { "Authorization": "Bearer " + GROQ_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0.8, max_tokens: 300, messages: [{ role: "user", content: ENHANCE_PROMPT(text) }] })
+    });
+    const d = await r.json();
+    const out = d?.choices?.[0]?.message?.content;
+    return out ? out.trim() : null;
+  } catch (e) { return null; }
+}
+
+app.post("/api/enhance", async (req, res) => {
+  const u = auth(req, res); if (!u) return;
+  const text = String((req.body && req.body.text) || "").slice(0, 600).trim();
+  if (!text) return res.status(400).json({ error: "no text" });
+  if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "no ai configured" });
+  let out = await enhanceGemini(text);
+  if (!out) out = await enhanceGroq(text);
+  if (!out) return res.status(502).json({ error: "empty" });
+  res.json({ ok: true, prompt: out });
 });
 
 app.listen(PORT, () => console.log("HALO backend listening on :" + PORT));
