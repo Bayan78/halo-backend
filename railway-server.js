@@ -25,6 +25,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BOT_TOKEN      = process.env.BOT_TOKEN || "";
 const OWNER_ID       = Number(process.env.OWNER_ID || 976860643);
+// Белый список безлимитных «своих» (жена/сын/партнёр): OWNER_IDS=976860643,111,222
+const OWNER_SET      = new Set(String(process.env.OWNER_IDS || process.env.OWNER_ID || 976860643).split(",").map(s => Number(s.trim())).filter(Boolean));
+OWNER_SET.add(OWNER_ID);
+function isOwnerId(id){ return OWNER_SET.has(Number(id)); }
 const ADSGRAM_SECRET = process.env.ADSGRAM_SECRET || "";
 const START_CREDITS  = Number(process.env.START_CREDITS || 8);
 const AD_REWARD      = Number(process.env.AD_REWARD || 5);
@@ -39,6 +43,7 @@ const PRO_DAYS       = Number(process.env.PRO_DAYS || 30);       // длител
 const PRO_STARS      = Number(process.env.PRO_STARS || 250);     // цена PRO в Telegram Stars
 const GROQ_API_KEY   = process.env.GROQ_API_KEY || "";           // ключ Groq для улучшения промптов
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";         // ключ Google Gemini (основной, с фолбэком на Groq)
+const ADMIN_KEY      = process.env.ADMIN_KEY || "";              // ключ для доступа к /admin (задай свой)
 
 // --- Видео-API (генеративное видео) ---
 const REPLICATE_TOKEN = process.env.REPLICATE_TOKEN || "";        // ключ Replicate (r8_...)
@@ -48,15 +53,15 @@ const VIDEO_DURATION  = Number(process.env.VIDEO_DURATION || 5);  // 5 или 10
 // Три модели, сверенные по страницам Replicate (schema подтверждена).
 // Каждая знает свой точный набор полей input.
 const VIDEO_MODELS = {
-  // Kling 2.1 Master — text-to-video, 1080p, 5/10 сек
+  // Kling 2.1 Master — text/image-to-video, поле картинки: start_image
   kling: {
-    slug: "kwaivgi/kling-v2.1-master",
+    slug: "kwaivgi/kling-v2.1-master", imgField: "start_image",
     cost: Number(process.env.COST_KLING || 10),
     build: (prompt, o) => ({ prompt, duration: pick(o.duration, [5, 10], 5), aspect_ratio: o.aspect })
   },
-  // Veo 3.1 — 4/6/8 сек, 16:9/9:16, звук. Разрешение: 8с → 1080p, иначе 720p.
+  // Veo 3.1 — поле картинки: image
   veo3: {
-    slug: "google/veo-3.1",
+    slug: "google/veo-3.1", imgField: "image",
     cost: Number(process.env.COST_VEO || 15),
     build: (prompt, o) => {
       const dur = pick(o.duration, [4, 6, 8], 8);
@@ -69,11 +74,17 @@ const VIDEO_MODELS = {
       };
     }
   },
-  // Seedance 1.0 Pro — 1080p, 5/10 сек
+  // Seedance 1.0 Pro — поле картинки: image
   seedance: {
-    slug: "bytedance/seedance-1-pro",
+    slug: "bytedance/seedance-1-pro", imgField: "image",
     cost: Number(process.env.COST_SEEDANCE || 10),
     build: (prompt, o) => ({ prompt, duration: pick(o.duration, [5, 10], 5), aspect_ratio: o.aspect, resolution: "1080p", fps: 24 })
+  },
+  // Seedance 2.0 — мультимодальный: первый кадр (image), последний (last_frame_image), референсы (reference_images), звук
+  seedance2: {
+    slug: "bytedance/seedance-2.0", imgField: "image", audio: true,
+    cost: Number(process.env.COST_SEEDANCE2 || 15),
+    build: (prompt, o) => ({ prompt, duration: pick(o.duration, [5, 10], 5), aspect_ratio: o.aspect, resolution: "720p", generate_audio: o.audio })
   }
 };
 function pick(val, allowed, def){ return allowed.includes(Number(val)) ? Number(val) : def; }
@@ -82,8 +93,17 @@ function videoCost(modelKey){ return videoModel(modelKey).cost; }
 function buildVideoInput(modelKey, prompt, opts){
   const m = videoModel(modelKey);
   const aspect = ["16:9", "9:16", "1:1"].includes(opts.aspect) ? opts.aspect : "16:9";
-  const audio  = opts.audio !== false; // по умолчанию со звуком
-  return { slug: m.slug, input: m.build(prompt, { duration: opts.duration, aspect, audio }) };
+  const audio  = opts.audio !== false;
+  const input = m.build(prompt, { duration: opts.duration, aspect, audio });
+  const imgs = Array.isArray(opts.images) ? opts.images.filter(Boolean) : [];
+  if (imgs.length && m.imgField) {
+    input[m.imgField] = imgs[0]; // первый кадр — у всех моделей
+    if (modelKey === "seedance2") { // расширенные режимы — только Seedance 2.0
+      if (opts.photoMode === "firstlast" && imgs[1]) input.last_frame_image = imgs[1];
+      if (opts.photoMode === "refs" && imgs.length > 1) input.reference_images = imgs;
+    }
+  }
+  return { slug: m.slug, input };
 }
 
 if (!BOT_TOKEN) console.warn("WARN: BOT_TOKEN не задан — проверка подписи Telegram работать не будет.");
@@ -137,7 +157,7 @@ function spendPaid(id, n){
 }
 
 // PRO
-function isProUser(id){ if (id === OWNER_ID) return true; const r = row(id); return (r.pro_until || 0) > Date.now(); }
+function isProUser(id){ if (isOwnerId(id)) return true; const r = row(id); return (r.pro_until || 0) > Date.now(); }
 function grantProDays(id, days){ const base = Math.max(Date.now(), row(id).pro_until || 0); const until = base + days * 86400000; qPro.run(until, id); return until; }
 
 // Дневной бонус
@@ -157,6 +177,16 @@ function applyReferral(newId, refId){
   qRefN.run(refId);
   return true;
 }
+
+// ---------- Статистика (для админ-панели) ----------
+db.exec(`CREATE TABLE IF NOT EXISTS counters(name TEXT PRIMARY KEY, val INTEGER NOT NULL DEFAULT 0)`);
+db.exec(`CREATE TABLE IF NOT EXISTS payments(id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER, kind TEXT, stars INTEGER, ts INTEGER)`);
+const qIncC   = db.prepare("INSERT INTO counters(name,val) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET val=val+excluded.val");
+const qGetC   = db.prepare("SELECT val FROM counters WHERE name=?");
+const qPayIns = db.prepare("INSERT INTO payments(uid,kind,stars,ts) VALUES(?,?,?,?)");
+function incCounter(name, by = 1){ qIncC.run(name, by); }
+function getCounter(name){ const r = qGetC.get(name); return r ? r.val : 0; }
+function logPayment(uid, kind, stars){ qPayIns.run(uid, kind, stars, Date.now()); }
 
 // ---------- Telegram WebApp initData validation ----------
 // secret_key = HMAC_SHA256(key="WebAppData", data=BOT_TOKEN)
@@ -182,7 +212,7 @@ function verifyInitData(initData){
 
 // ---------- App ----------
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "8mb" })); // до 8МБ — для загрузки фото (image-to-video)
 app.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Headers", "Content-Type");
@@ -202,9 +232,9 @@ app.post("/api/credits", (req, res) => {
   const u = auth(req, res); if (!u) return;
   const r = row(u.id);
   res.json({
-    owner: u.id === OWNER_ID,
-    free: u.id === OWNER_ID ? null : r.credits,
-    paid: u.id === OWNER_ID ? null : (r.paid_credits || 0),
+    owner: isOwnerId(u.id),
+    free: isOwnerId(u.id) ? null : r.credits,
+    paid: isOwnerId(u.id) ? null : (r.paid_credits || 0),
     pro: isProUser(u.id),
     pro_until: r.pro_until || 0,
     bonus: bonusAvailable(u.id),
@@ -216,8 +246,9 @@ app.post("/api/credits", (req, res) => {
 app.post("/api/spend", (req, res) => {
   const u = auth(req, res); if (!u) return;
   const amount = Math.max(1, Number(req.body.amount || 1));
-  if (u.id === OWNER_ID) return res.json({ ok: true, owner: true, free: null, paid: null });
+  if (isOwnerId(u.id)) return res.json({ ok: true, owner: true, free: null, paid: null });
   const r = spendAny(u.id, amount);
+  if (r.ok) incCounter("gen_media");
   res.json(r);
 });
 
@@ -230,7 +261,7 @@ app.get("/api/adsgram/reward", (req, res) => {
   if (ADSGRAM_SECRET && req.query.key !== ADSGRAM_SECRET) return res.sendStatus(403);
   const id = Number(req.query.userid);
   if (!id) return res.sendStatus(400);
-  if (id !== OWNER_ID) addCredits(id, AD_REWARD);
+  if (!isOwnerId(id)) addCredits(id, AD_REWARD);
   res.sendStatus(200); // AdsGram ждёт 200 OK
 });
 
@@ -244,29 +275,33 @@ app.get("/health", (_req, res) => res.type("text").send("HALO credits backend ·
 // клиент опрашивает статус до готовности. Ключ провайдера живёт только на сервере.
 app.post("/api/video/generate", async (req, res) => {
   const u = auth(req, res); if (!u) return;
-  const prompt = String((req.body && req.body.prompt) || "").slice(0, 1000);
-  if (!prompt) return res.status(400).json({ ok: false, error: "no prompt" });
+  const images = Array.isArray(req.body && req.body.images) ? req.body.images
+               : ((req.body && req.body.image) ? [req.body.image] : []);
+  let prompt = String((req.body && req.body.prompt) || "").slice(0, 1000).trim();
+  if (!prompt && !images.length) return res.status(400).json({ ok: false, error: "no prompt" });
+  if (!prompt && images.length) prompt = "cinematic subtle natural motion, smooth camera movement";
   if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "video api not configured" });
   if (!isProUser(u.id)) return res.json({ ok: false, error: "pro_required" }); // AI-видео — только PRO
 
   const cost = videoCost(req.body.model); // цена зависит от модели (Veo дороже)
   // AI-видео — только за КУПЛЕННЫЕ кредиты (владельцу бесплатно)
-  if (u.id !== OWNER_ID) {
+  if (!isOwnerId(u.id)) {
     const r = spendPaid(u.id, cost);
     if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid });
   }
   try {
-    const { slug, input } = buildVideoInput(req.body.model, prompt, { aspect: req.body.aspect, duration: req.body.duration, audio: req.body.audio });
+    const { slug, input } = buildVideoInput(req.body.model, prompt, { aspect: req.body.aspect, duration: req.body.duration, audio: req.body.audio, images, photoMode: req.body.photoMode });
     const r = await fetch(`https://api.replicate.com/v1/models/${slug}/predictions`, {
       method: "POST",
       headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({ input })
     });
     const d = await r.json();
-    if (!r.ok || !d.id) { if (u.id !== OWNER_ID) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
-    res.json({ ok: true, id: d.id, status: d.status, paid: u.id === OWNER_ID ? null : paidBal(u.id) });
+    if (!r.ok || !d.id) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
+    incCounter("gen_video");
+    res.json({ ok: true, id: d.id, status: d.status, paid: isOwnerId(u.id) ? null : paidBal(u.id) });
   } catch (e) {
-    if (u.id !== OWNER_ID) addPaid(u.id, cost);
+    if (!isOwnerId(u.id)) addPaid(u.id, cost);
     res.status(500).json({ ok: false, error: "provider" });
   }
 });
@@ -336,7 +371,7 @@ app.post("/api/pay/invoice", async (req, res) => {
 // Дневной бонус
 app.post("/api/bonus/claim", (req, res) => {
   const u = auth(req, res); if (!u) return;
-  if (u.id === OWNER_ID) return res.json({ ok: true, credits: null });
+  if (isOwnerId(u.id)) return res.json({ ok: true, credits: null });
   res.json(claimBonus(u.id));
 });
 
@@ -345,7 +380,7 @@ app.post("/api/referral", (req, res) => {
   const u = auth(req, res); if (!u) return;
   const refId = Number(req.body.ref);
   const applied = applyReferral(u.id, refId);
-  res.json({ ok: applied, credits: u.id === OWNER_ID ? null : balance(u.id) });
+  res.json({ ok: applied, credits: isOwnerId(u.id) ? null : balance(u.id) });
 });
 
 // Вебхук Telegram: подтверждаем оплату и начисляем кредиты.
@@ -363,6 +398,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         const uid = Number(parts[1]);
         if (parts[0] === "credits" && uid && Number(parts[2])) addPaid(uid, Number(parts[2]));   // купленные кредиты
         else if (parts[0] === "pro" && uid && Number(parts[2])) grantProDays(uid, Number(parts[2]));
+        if (uid) logPayment(uid, parts[0] || "?", Number(sp.total_amount || 0)); // лог для статистики
       }
     }
   } catch (e) { /* глотаем, чтобы Telegram не ретраил бесконечно */ }
@@ -406,6 +442,93 @@ app.post("/api/enhance", async (req, res) => {
   if (!out) out = await enhanceGroq(text);
   if (!out) return res.status(502).json({ error: "empty" });
   res.json({ ok: true, prompt: out });
+});
+
+// ---------- Админ-панель (только по ADMIN_KEY) ----------
+app.get("/api/admin/stats", (req, res) => {
+  if (!ADMIN_KEY || req.query.key !== ADMIN_KEY) return res.sendStatus(403);
+  const now = Date.now();
+  const one = (sql, ...a) => db.prepare(sql).get(...a);
+  res.json({
+    users:      one("SELECT COUNT(*) c FROM users").c,
+    proActive:  one("SELECT COUNT(*) c FROM users WHERE pro_until > ?", now).c,
+    referrals:  one("SELECT COALESCE(SUM(referrals),0) s FROM users").s,
+    freeOut:    one("SELECT COALESCE(SUM(credits),0) s FROM users").s,
+    paidOut:    one("SELECT COALESCE(SUM(paid_credits),0) s FROM users").s,
+    genMedia:   getCounter("gen_media"),
+    genVideo:   getCounter("gen_video"),
+    payCount:   one("SELECT COUNT(*) c FROM payments").c,
+    starsTotal: one("SELECT COALESCE(SUM(stars),0) s FROM payments").s,
+    recent:     db.prepare("SELECT uid,kind,stars,ts FROM payments ORDER BY id DESC LIMIT 20").all()
+  });
+});
+
+const ADMIN_HTML = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HALO · Админ</title>
+<style>body{margin:0;background:#0B0A14;color:#F5F3FF;font-family:system-ui,sans-serif;padding:22px}h1{font-size:20px;margin:0 0 4px}.sub{color:#9C97B8;font-size:13px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{background:#161327;border:1px solid rgba(160,150,220,.18);border-radius:14px;padding:16px}
+.card .n{font-size:26px;font-weight:700;background:linear-gradient(105deg,#A855F7,#EC4899,#22D3EE);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.card .l{font-size:12px;color:#9C97B8;margin-top:4px}
+h2{font-size:14px;color:#9C97B8;margin:24px 0 10px;text-transform:uppercase;letter-spacing:.1em}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:8px;border-bottom:1px solid rgba(160,150,220,.12)}th{color:#9C97B8}
+.err{color:#FCA5A5;padding:20px}</style></head><body>
+<h1>HALO Studio · Админ</h1><div class="sub" id="sub">загрузка…</div>
+<div class="grid" id="cards"></div>
+<h2>Выдать PRO вручную</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+<input id="g-uid" placeholder="Telegram ID" style="background:#0B0A14;border:1px solid rgba(160,150,220,.28);border-radius:10px;color:#F5F3FF;padding:10px 12px;font-size:14px">
+<input id="g-days" value="30" style="width:70px;background:#0B0A14;border:1px solid rgba(160,150,220,.28);border-radius:10px;color:#F5F3FF;padding:10px 12px;font-size:14px">
+<button onclick="grant()" style="background:linear-gradient(105deg,#A855F7,#EC4899,#22D3EE);color:#0B0A14;border:none;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer">Выдать PRO</button>
+<button onclick="revoke()" style="background:#161327;color:#FCA5A5;border:1px solid rgba(160,150,220,.28);border-radius:10px;padding:10px 16px;cursor:pointer">Забрать</button>
+<span id="g-res" style="color:#9C97B8;font-size:13px"></span>
+</div>
+<div class="sub" style="margin-top:0">ID узнаётся через @userinfobot. Дни — на сколько выдать (по умолчанию 30).</div>
+<h2>Последние платежи</h2><table id="pay"><thead><tr><th>Когда</th><th>User ID</th><th>Тип</th><th>Stars</th></tr></thead><tbody></tbody></table>
+<script>
+const key=new URLSearchParams(location.search).get("key");
+async function load(){
+  try{
+    const r=await fetch("/api/admin/stats?key="+encodeURIComponent(key||""));
+    if(!r.ok){ document.body.innerHTML='<div class="err">Нет доступа. Открой /admin?key=ТВОЙ_ADMIN_KEY</div>'; return; }
+    const d=await r.json();
+    document.getElementById("sub").textContent="обновлено "+new Date().toLocaleString("ru");
+    const cards=[["Пользователей",d.users],["Активных PRO",d.proActive],["Продано Stars",d.starsTotal],["Покупок",d.payCount],["Генераций фото/слайд",d.genMedia],["AI-видео",d.genVideo],["Рефералов",d.referrals],["Бесплатных ⚡ на руках",d.freeOut],["Купленных 💎 на руках",d.paidOut]];
+    document.getElementById("cards").innerHTML=cards.map(([l,n])=>'<div class="card"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>').join("");
+    document.querySelector("#pay tbody").innerHTML=(d.recent||[]).map(p=>'<tr><td>'+new Date(p.ts).toLocaleString("ru")+'</td><td>'+p.uid+'</td><td>'+(p.kind==="pro"?"PRO":"Кредиты")+'</td><td>'+p.stars+' ★</td></tr>').join("")||'<tr><td colspan=4 style="color:#6F6A8C">пока нет платежей</td></tr>';
+  }catch(e){ document.getElementById("sub").textContent="ошибка загрузки"; }
+}
+load(); setInterval(load, 15000);
+async function grant(){
+  const uid=document.getElementById("g-uid").value.trim(), days=document.getElementById("g-days").value.trim()||"30";
+  if(!uid){ document.getElementById("g-res").textContent="введи ID"; return; }
+  const r=await fetch("/api/admin/grant?key="+encodeURIComponent(key)+"&uid="+uid+"&days="+days);
+  document.getElementById("g-res").textContent = r.ok ? ("✓ PRO выдан на "+days+" дн.") : "ошибка";
+  if(r.ok) load();
+}
+async function revoke(){
+  const uid=document.getElementById("g-uid").value.trim();
+  if(!uid){ document.getElementById("g-res").textContent="введи ID"; return; }
+  const r=await fetch("/api/admin/revoke?key="+encodeURIComponent(key)+"&uid="+uid);
+  document.getElementById("g-res").textContent = r.ok ? "✓ PRO забран" : "ошибка";
+  if(r.ok) load();
+}
+</script></body></html>`;
+app.get("/admin", (_req, res) => res.type("html").send(ADMIN_HTML));
+
+// Выдать / забрать PRO вручную (только по ADMIN_KEY)
+app.get("/api/admin/grant", (req, res) => {
+  if (!ADMIN_KEY || req.query.key !== ADMIN_KEY) return res.sendStatus(403);
+  const uid = Number(req.query.uid), days = Number(req.query.days || 30);
+  if (!uid) return res.status(400).json({ error: "no uid" });
+  const until = grantProDays(uid, days > 0 ? days : 30);
+  res.json({ ok: true, uid, pro_until: until });
+});
+app.get("/api/admin/revoke", (req, res) => {
+  if (!ADMIN_KEY || req.query.key !== ADMIN_KEY) return res.sendStatus(403);
+  const uid = Number(req.query.uid);
+  if (!uid) return res.status(400).json({ error: "no uid" });
+  qPro.run(0, uid);
+  res.json({ ok: true, uid });
 });
 
 app.listen(PORT, () => console.log("HALO backend listening on :" + PORT));

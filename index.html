@@ -270,12 +270,25 @@
           <option value="kling">Kling 2.1 · кинематографично, 1080p</option>
           <option value="veo3">Veo 3.1 · со звуком, 16:9/9:16</option>
           <option value="seedance">Seedance Pro · выгодно, 1080p</option>
+          <option value="seedance2">Seedance 2.0 · мультифото/сцена, звук</option>
         </select>
         <label class="fld">Длина клипа</label>
         <select id="v-aidur"></select>
         <div id="v-audio-row">
           <label class="fld">Звук</label>
           <button class="ptoggle on" id="v-aiaudio" style="width:100%;justify-content:center">Звук вкл</button>
+        </div>
+        <label class="fld">Своё фото — оживить (ты в кадре)</label>
+        <input type="file" id="v-photo" accept="image/*" multiple style="display:none">
+        <button class="ptoggle" id="v-photo-btn" style="width:100%;justify-content:center">📷 Загрузить фото (можно несколько)</button>
+        <div id="v-photo-list" style="display:none;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+        <div id="v-photo-mode-row" style="display:none">
+          <label class="fld">Режим фото (Seedance 2.0)</label>
+          <select id="v-photo-mode">
+            <option value="first">Первый кадр</option>
+            <option value="firstlast">Первый + последний</option>
+            <option value="refs">Референсы / сцена</option>
+          </select>
         </div>
       </div>
       <label class="fld">Стиль</label>
@@ -365,7 +378,8 @@ const DEV_PRO    = false;        // true = включить PRO при тест�
 const AFFILIATE_URL = "https://bayanchatbot.netlify.app"; // ссылка кнопки «Партнёрам» — подставь свою
 const BOT_USERNAME  = "HALOStudiobot"; // юзернейм бота Mini App (без @) — для реферальной ссылки
 const APP_NAME      = "studio";   // короткое имя Mini App из BotFather (t.me/HALOStudiobot/studio)
-let userPro = false, bonusReady = false, refCount = 0;
+let userPro = false, bonusReady = false, refCount = 0, serverOwner = false;
+function ownerFree(){ return isOwner || serverOwner; }  // владелец или из белого списка сервера
 
 const tgUser  = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
 const isOwner = DEV_OWNER || (tgUser && tgUser.id === OWNER_ID);
@@ -379,7 +393,7 @@ function totalCredits(){ return credits + paidCredits; }
 const creditN = document.getElementById("credit-n");
 const creditsPill = document.getElementById("credits");
 
-function renderCredits(){ creditN.textContent = isOwner ? "∞" : totalCredits(); }
+function renderCredits(){ creditN.textContent = ownerFree() ? "∞" : totalCredits(); }
 function saveCredits(){ if(!serverMode) persist.set("halo_credits", credits); renderCredits(); }
 function grantCredits(n){ if(isOwner) return; credits += n; saveCredits(); }
 function flashPill(){ creditsPill.classList.remove("flash"); void creditsPill.offsetWidth; creditsPill.classList.add("flash"); }
@@ -398,14 +412,15 @@ async function syncCredits(){
     if(typeof d.free === "number") credits = d.free;
     if(typeof d.paid === "number") paidCredits = d.paid;
     userPro = !!d.pro; bonusReady = !!d.bonus; refCount = d.referrals || 0;
-    isPro = isOwner || DEV_PRO || userPro;
+    serverOwner = !!d.owner;
+    isPro = isOwner || DEV_PRO || userPro || serverOwner;
     refreshPro(); setVideoCostBadge(); updateStoreUI();
   }catch(e){}
   renderCredits();
 }
 
 // true if the user currently has enough (owner always true). Cheap pre-check before generating.
-function canAfford(cost){ return isOwner || totalCredits() >= cost; }
+function canAfford(cost){ return ownerFree() || totalCredits() >= cost; }
 
 // charge on success; returns true if charged (owner = free noop)
 async function spend(n){
@@ -422,7 +437,7 @@ async function spend(n){
 }
 
 async function watchAdForCredits(){
-  if(isOwner){ toast("Владелец — безлимитный доступ ∞", true); return; }
+  if(ownerFree()){ toast("Безлимитный доступ ∞", true); return; }
   if(adController){
     try{
       await adController.show();          // резолвится только после полного просмотра рекламы
@@ -459,7 +474,7 @@ syncCredits();
 let genCount = 0;
 const INTERSTITIAL_EVERY = 3;   // показывать после каждой N-й генерации
 function maybeShowInterstitial(){
-  if(isOwner) return;           // владельцу рекламу не показываем
+  if(ownerFree()) return;       // владельцу/своим рекламу не показываем
   if(!adInterstitial) return;   // вне Telegram / SDK не загружен
   genCount++;
   if(genCount % INTERSTITIAL_EVERY !== 0) return;
@@ -569,7 +584,7 @@ function drawWatermark(ctx,w,h){
   ctx.fillText(text,x,y);
   ctx.restore();
 }
-function isClean(){ return isOwner || isPro; }   // чистый файл — PRO/владельцу
+function isClean(){ return ownerFree() || isPro; }   // чистый файл — PRO/владельцу
 async function downloadImage(url,name){
   if(isClean()) return downloadURL(url,name);
   try{
@@ -714,7 +729,7 @@ function playSequence(ctx,cv,frames,onDone){
     const moves=frames.map((_,i)=>({z0:1.06,z1:1.16,dx:(i%2?1:-1)*0.05,dy:(i%3?-1:1)*0.04}));
     const start=performance.now(),perFrame=HOLD;
     function drawFrame(img,mv,p,alpha){ const z=mv.z0+(mv.z1-mv.z0)*p; const iw=img.width,ih=img.height,cr=W/H,ir=iw/ih; let sw,sh; if(ir>cr){sh=ih;sw=ih*cr;}else{sw=iw;sh=iw/cr;} sw/=z;sh/=z; let sx=(iw-sw)/2+mv.dx*sw*p, sy=(ih-sh)/2+mv.dy*sh*p; sx=Math.max(0,Math.min(iw-sw,sx)); sy=Math.max(0,Math.min(ih-sh,sy)); ctx.globalAlpha=alpha; ctx.drawImage(img,sx,sy,sw,sh,0,0,W,H); }
-    const wm = !(isOwner || isPro);   // водяной знак на бесплатных клипах
+    const wm = !(ownerFree() || isPro);   // водяной знак на бесплатных клипах
     function loop(now){ const t=now-start, idx=Math.floor(t/perFrame);
       if(idx>=total){ ctx.globalAlpha=1; drawFrame(frames[total-1],moves[total-1],1,1); if(wm) drawWatermark(ctx,W,H); setTimeout(()=>{onDone&&onDone();resolve();},250); return; }
       const local=t-idx*perFrame,p=local/perFrame;
@@ -749,11 +764,39 @@ document.querySelectorAll("#v-mode .seg-btn").forEach(b=>{
 });
 const aiAudioBtn=document.getElementById("v-aiaudio");
 aiAudioBtn.onclick=()=>{ const on=!aiAudioBtn.classList.contains("on"); aiAudioBtn.classList.toggle("on",on); aiAudioBtn.textContent=on?"Звук вкл":"Звук выкл"; };
-const AI_COST = { veo3:15, kling:10, seedance:10 };
+// Загрузка своего фото (image-to-video)
+function downscaleImage(file,max){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{ let w=img.width,h=img.height; if(w>max||h>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); } const cv=document.createElement("canvas"); cv.width=w; cv.height=h; cv.getContext("2d").drawImage(img,0,0,w,h); res(cv.toDataURL("image/jpeg",0.85)); };
+    img.onerror=rej;
+    const fr=new FileReader(); fr.onload=()=>img.src=fr.result; fr.onerror=rej; fr.readAsDataURL(file);
+  });
+}
+const vPhotoInput=document.getElementById("v-photo"), vPhotoBtn=document.getElementById("v-photo-btn");
+state.video.photos = state.video.photos || [];
+function renderPhotos(){
+  const list=document.getElementById("v-photo-list"), modeRow=document.getElementById("v-photo-mode-row");
+  const arr=state.video.photos;
+  if(!arr.length){ list.style.display="none"; modeRow.style.display="none"; vPhotoBtn.textContent="📷 Загрузить фото (можно несколько)"; return; }
+  list.style.display="flex";
+  list.innerHTML=arr.map((u,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px solid var(--line-strong)"><img src="${u}" style="width:100%;height:100%;object-fit:cover"><button data-i="${i}" class="phx" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:5px;border:none;background:rgba(11,10,20,.8);color:#FCA5A5;font-size:12px;line-height:1;cursor:pointer">×</button></div>`).join("");
+  list.querySelectorAll(".phx").forEach(b=>b.onclick=()=>{ arr.splice(Number(b.dataset.i),1); renderPhotos(); });
+  modeRow.style.display = arr.length>1 ? "" : "none";
+  vPhotoBtn.textContent="📷 Добавить ещё фото";
+}
+vPhotoBtn.onclick=()=>vPhotoInput.click();
+vPhotoInput.onchange=async()=>{
+  const files=[...(vPhotoInput.files||[])];
+  for(const f of files){ if(state.video.photos.length>=6) break; try{ state.video.photos.push(await downscaleImage(f,1024)); }catch(e){} }
+  vPhotoInput.value=""; renderPhotos();
+  if(state.video.photos.length>1 && document.getElementById("v-aimodel").value!=="seedance2"){ toast("Несколько фото и режимы — на модели Seedance 2.0"); }
+};
+const AI_COST = { veo3:15, kling:10, seedance:10, seedance2:15 };
 function aiCost(){ return AI_COST[document.getElementById("v-aimodel").value] || 10; }
 function setVideoCostBadge(){
   const c=document.querySelector("#v-go .cost"); if(!c) return;
-  if(isOwner){ c.textContent="· ∞"; return; }
+  if(ownerFree()){ c.textContent="· ∞"; return; }
   c.textContent = videoMode==="ai" ? ("· "+aiCost()+"⚡") : "· 3⚡";
 }
 function updateAiControls(){
@@ -762,31 +805,34 @@ function updateAiControls(){
   const opts = model==="veo3" ? [[4,"4 секунды"],[6,"6 секунд"],[8,"8 секунд"]] : [[5,"5 секунд"],[10,"10 секунд"]];
   const def  = model==="veo3" ? 8 : 5;
   dur.innerHTML=opts.map(([v,l])=>`<option value="${v}"${v===def?" selected":""}>${l}</option>`).join("");
-  document.getElementById("v-audio-row").style.display = model==="veo3" ? "" : "none";
+  document.getElementById("v-audio-row").style.display = (model==="veo3"||model==="seedance2") ? "" : "none";
   setVideoCostBadge();
 }
 document.getElementById("v-aimodel").onchange=updateAiControls;
 updateAiControls();
-{ const ic=document.querySelector("#i-go .cost"); if(ic) ic.textContent = isOwner ? "· ∞" : "· 1⚡"; }
+{ const ic=document.querySelector("#i-go .cost"); if(ic) ic.textContent = ownerFree() ? "· ∞" : "· 1⚡"; }
 setVideoCostBadge();
 
 /* ---- Real generative video via backend (Replicate/Kling/etc.) ---- */
 async function buildAIVideo(){
   const base=document.getElementById("v-prompt").value.trim();
-  if(!base){document.getElementById("v-prompt").focus();return;}
+  const photos=state.video.photos||[];
+  if(!base && !photos.length){document.getElementById("v-prompt").focus(); toast("Впиши идею или загрузи фото"); return;}
   if(!serverMode){ toast("AI-видео требует подключённый сервер и видео-API (задай API_BASE)."); return; }
   const prompt=fullPrompt(base,state.video.styles);
   const aiModel=document.getElementById("v-aimodel").value;
   const aspect=ratioToAspect(document.getElementById("v-ratio").value);
   const dur=parseInt(document.getElementById("v-aidur").value);
   const audio=document.getElementById("v-aiaudio").classList.contains("on");
-  if(!isOwner && paidCredits < aiCost()){ toast("AI-видео — только за купленные кредиты 💎. Пополни в магазине."); openStore(); return; }
+  if(!ownerFree() && paidCredits < aiCost()){ toast("AI-видео — только за купленные кредиты 💎. Пополни в магазине."); openStore(); return; }
   const go=document.getElementById("v-go"); go.disabled=true; vDownload.disabled=true; vReplay.disabled=true;
   document.getElementById("v-mp4").style.display="none"; state.video.aiUrl=null; state.video.blob=null;
   vStatus.innerHTML=`<span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>AI-рендер`;
-  showLoading(vCanvasWrap,"Генерирую AI-видео… это до минуты");
+  showLoading(vCanvasWrap, photos.length?"Оживляю фото… это до минуты":"Генерирую AI-видео… это до минуты");
   try{
-    const d=await serverCall("/api/video/generate",{prompt, model:aiModel, aspect, duration:dur, audio});
+    const payload={prompt, model:aiModel, aspect, duration:dur, audio};
+    if(photos.length){ payload.images=photos; payload.photoMode=document.getElementById("v-photo-mode").value; }
+    const d=await serverCall("/api/video/generate", payload);
     if(!d.ok){
       if(d.error==="pro_required"){ showError(vCanvasWrap,"AI-видео доступно только в PRO."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; openStore(); return; }
       if(d.error==="need_paid"){ if(typeof d.paid==="number"){paidCredits=d.paid;renderCredits();} showError(vCanvasWrap,"AI-видео — только за купленные кредиты 💎."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; openStore(); return; }
@@ -860,12 +906,12 @@ document.getElementById("store-ad").onclick=()=>{ closeStore(); watchAdForCredit
 
 function updateStoreUI(){
   const bal=document.getElementById("store-bal");
-  if(bal){ bal.style.display = isOwner ? "none" : ""; bal.innerHTML = `Бесплатные: <b>${credits}⚡</b> · Купленные: <b>${paidCredits}💎</b>`; }
+  if(bal){ bal.style.display = ownerFree() ? "none" : ""; bal.innerHTML = `Бесплатные: <b>${credits}⚡</b> · Купленные: <b>${paidCredits}💎</b>`; }
   const proBtn=document.getElementById("store-pro");
-  if(proBtn) proBtn.style.display = (isOwner||isPro) ? "none" : "";
+  if(proBtn) proBtn.style.display = (ownerFree()||isPro) ? "none" : "";
   const bonusBtn=document.getElementById("store-bonus");
   if(bonusBtn){
-    if(isOwner){ bonusBtn.style.display="none"; }
+    if(ownerFree()){ bonusBtn.style.display="none"; }
     else { bonusBtn.style.display=""; bonusBtn.disabled=!bonusReady; bonusBtn.textContent = bonusReady ? "🎁 Ежедневный бонус · +5⚡" : "🎁 Бонус получен — приходи завтра"; }
   }
   const inv=document.getElementById("store-invite");
@@ -908,7 +954,7 @@ async function buyPack(i){
 }
 
 // клик по балансу: владелец → ∞, остальные → магазин
-creditsPill.onclick = ()=>{ if(isOwner){ toast("Владелец — безлимитный доступ ∞", true); return; } openStore(); };
+creditsPill.onclick = ()=>{ if(ownerFree()){ toast("Безлимитный доступ ∞", true); return; } openStore(); };
 
 // Реферал при первом заходе по ссылке ?startapp=ref_<id>
 (function initReferral(){
