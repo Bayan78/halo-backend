@@ -44,6 +44,7 @@ const PRO_STARS      = Number(process.env.PRO_STARS || 250);     // цена PRO
 const GROQ_API_KEY   = process.env.GROQ_API_KEY || "";           // ключ Groq для улучшения промптов
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";         // ключ Google Gemini (основной, с фолбэком на Groq)
 const ADMIN_KEY      = process.env.ADMIN_KEY || "";              // ключ для доступа к /admin (задай свой)
+const APP_URL        = process.env.APP_URL || "https://halo-backend-production-44c1.up.railway.app/app"; // ссылка Mini App для кнопки /start
 
 // --- Видео-API (генеративное видео) ---
 const REPLICATE_TOKEN = process.env.REPLICATE_TOKEN || "";        // ключ Replicate (r8_...)
@@ -85,6 +86,18 @@ const VIDEO_MODELS = {
     slug: "bytedance/seedance-2.0", imgField: "image", audio: true,
     cost: Number(process.env.COST_SEEDANCE2 || 15),
     build: (prompt, o) => ({ prompt, duration: pick(o.duration, [5, 10], 5), aspect_ratio: o.aspect, resolution: "720p", generate_audio: o.audio })
+  },
+  // Hailuo (Minimax) — оживление фото, поле картинки: first_frame_image. Дёшево, 6/10 сек.
+  hailuo: {
+    slug: "minimax/hailuo-02", imgField: "first_frame_image",
+    cost: Number(process.env.COST_HAILUO || 8),
+    build: (prompt, o) => ({ prompt, duration: pick(o.duration, [6, 10], 6) })
+  },
+  // Luma Ray — плавное движение, поле картинки: start_image_url. Фото/текст, 5/10 сек.
+  luma: {
+    slug: "luma/ray-flash-2-720p", imgField: "start_image_url",
+    cost: Number(process.env.COST_LUMA || 12),
+    build: (prompt, o) => ({ prompt, duration: pick(o.duration, [5, 10], 5) })
   }
 };
 function pick(val, allowed, def){ return allowed.includes(Number(val)) ? Number(val) : def; }
@@ -323,6 +336,50 @@ app.post("/api/video/status", async (req, res) => {
   }
 });
 
+// Переделать фото (image-to-image через FLUX Kontext) — PRO, за купленные кредиты
+app.post("/api/restyle", async (req, res) => {
+  const u = auth(req, res); if (!u) return;
+  if (!isProUser(u.id)) return res.json({ ok: false, error: "pro_required" });
+  const image = req.body && req.body.image ? String(req.body.image) : null;
+  const prompt = String((req.body && req.body.prompt) || "").slice(0, 600).trim();
+  if (!image || !prompt) return res.status(400).json({ ok: false, error: "need image+prompt" });
+  if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "no api" });
+  const cost = Number(process.env.COST_RESTYLE || 4);
+  if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
+  try {
+    const rr = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
+      method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ input: { prompt, input_image: image } })
+    });
+    const d = await rr.json();
+    if (!rr.ok || !d.id) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
+    incCounter("gen_media");
+    res.json({ ok: true, id: d.id, status: d.status, paid: isOwnerId(u.id) ? null : paidBal(u.id) });
+  } catch (e) { if (!isOwnerId(u.id)) addPaid(u.id, cost); res.status(500).json({ ok: false, error: "provider" }); }
+});
+
+// Апскейл / HD (Real-ESRGAN) — PRO, за купленные кредиты
+app.post("/api/upscale", async (req, res) => {
+  const u = auth(req, res); if (!u) return;
+  if (!isProUser(u.id)) return res.json({ ok: false, error: "pro_required" });
+  const image = req.body && req.body.image ? String(req.body.image) : null;
+  const scale = [2, 4].includes(Number(req.body.scale)) ? Number(req.body.scale) : 2;
+  if (!image) return res.status(400).json({ ok: false, error: "no image" });
+  if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "no api" });
+  const cost = Number(process.env.COST_UPSCALE || 2) * (scale === 4 ? 2 : 1);
+  if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
+  try {
+    const rr = await fetch("https://api.replicate.com/v1/models/nightmareai/real-esrgan/predictions", {
+      method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ input: { image, scale, face_enhance: true } })
+    });
+    const d = await rr.json();
+    if (!rr.ok || !d.id) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
+    incCounter("gen_media");
+    res.json({ ok: true, id: d.id, status: d.status, paid: isOwnerId(u.id) ? null : paidBal(u.id) });
+  } catch (e) { if (!isOwnerId(u.id)) addPaid(u.id, cost); res.status(500).json({ ok: false, error: "provider" }); }
+});
+
 // ---------- Telegram Stars: продажа кредитов ----------
 const CREDIT_PACKS = [
   { credits: 60,  stars: Number(process.env.PACK1_STARS || 50)  },
@@ -400,6 +457,12 @@ app.post("/api/telegram/webhook", async (req, res) => {
         else if (parts[0] === "pro" && uid && Number(parts[2])) grantProDays(uid, Number(parts[2]));
         if (uid) logPayment(uid, parts[0] || "?", Number(sp.total_amount || 0)); // лог для статистики
       }
+    } else if (upd.message && typeof upd.message.text === "string" && upd.message.text.trim().startsWith("/start")) {
+      await tgApi("sendMessage", {
+        chat_id: upd.message.chat.id,
+        text: "✨ HALO Studio — AI фото и видео прямо в Telegram.\n\nСоздавай изображения, оживляй фото и делай клипы. Нажми кнопку ниже 👇",
+        reply_markup: { inline_keyboard: [[{ text: "🚀 Открыть HALO Studio", web_app: { url: APP_URL } }]] }
+      });
     }
   } catch (e) { /* глотаем, чтобы Telegram не ретраил бесконечно */ }
   res.sendStatus(200);

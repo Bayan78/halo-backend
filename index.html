@@ -202,6 +202,7 @@
       <div><h1>HALO Studio<span class="pro-badge" id="pro-badge">PRO</span></h1><span>AI Photo &amp; Video</span></div>
     </div>
     <div class="right-cluster">
+      <button class="hbtn" id="lang-btn" title="Тіл / Язык">ҚАЗ</button>
       <button class="hbtn" id="partner-btn" title="Партнёрам и бонусам">★</button>
       <div class="credits" id="credits" title="Пополнить кредиты">
         <span class="bolt"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" fill="currentColor"/></svg></span>
@@ -224,6 +225,13 @@
       <label class="fld">Опиши, что создать</label>
       <textarea id="i-prompt" placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…"></textarea>
       <button class="enhance" id="i-enhance"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="currentColor"/></svg>Улучшить промпт через AI</button>
+      <label class="fld">Переделать своё фото (по описанию)</label>
+      <input type="file" id="i-photo" accept="image/*" style="display:none">
+      <button class="ptoggle" id="i-photo-btn" style="width:100%;justify-content:center">📷 Загрузить фото для переделки</button>
+      <div id="i-photo-prev" style="display:none;position:relative;margin-top:10px">
+        <img id="i-photo-img" alt="" style="width:100%;border-radius:12px;display:block">
+        <button id="i-photo-x" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:9px;border:1px solid var(--line-strong);background:rgba(11,10,20,.75);color:#FCA5A5;font-size:16px;line-height:1;cursor:pointer">×</button>
+      </div>
       <label class="fld">Стиль</label>
       <div class="chips" id="i-styles"></div>
       <div class="grid2" style="margin-top:16px">
@@ -249,6 +257,8 @@
       <div class="result-actions">
         <button class="btn-ghost" id="i-download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Скачать</button>
         <button class="btn-ghost" id="i-variant" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 00-14.9-2M4 16a8 8 0 0014.9 2"/></svg>Вариация</button>
+        <button class="btn-ghost" id="i-share" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12v8h16v-8M12 3v13m0-13l-4 4m4-4l4 4"/></svg>Поделиться</button>
+        <button class="btn-ghost" id="i-upscale" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/></svg>HD ×2</button>
       </div>
     </div>
   </section>
@@ -262,6 +272,7 @@
       <button class="enhance" id="v-enhance"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="currentColor"/></svg>Улучшить промпт через AI</button>
       <div class="seg" id="v-mode">
         <button class="seg-btn on" data-mode="slideshow">Слайд-шоу · free</button>
+        <button class="seg-btn" data-mode="story">🎬 Мультфильм</button>
         <button class="seg-btn" data-mode="ai">AI-видео · PRO</button>
       </div>
       <div id="v-ai-opts" style="display:none;margin-top:14px">
@@ -271,6 +282,8 @@
           <option value="veo3">Veo 3.1 · со звуком, 16:9/9:16</option>
           <option value="seedance">Seedance Pro · выгодно, 1080p</option>
           <option value="seedance2">Seedance 2.0 · мультифото/сцена, звук</option>
+          <option value="hailuo">Hailuo 2 · оживление фото, дёшево</option>
+          <option value="luma">Luma Ray · плавно, фото/текст</option>
         </select>
         <label class="fld">Длина клипа</label>
         <select id="v-aidur"></select>
@@ -317,6 +330,7 @@
       <div class="result-actions">
         <button class="btn-ghost" id="v-download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Скачать видео</button>
         <button class="btn-ghost" id="v-replay" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v6h6M20 8a8 8 0 00-14.9-2M20 20v-6h-6M4 16a8 8 0 0014.9 2"/></svg>Заново</button>
+        <button class="btn-ghost" id="v-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12v8h16v-8M12 3v13m0-13l-4 4m4-4l4 4"/></svg>Поделиться</button>
         <button class="btn-ghost" id="v-mp4" disabled style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>MP4</button>
       </div>
     </div>
@@ -536,6 +550,7 @@ wireEnhance("i-enhance","i-prompt"); wireEnhance("v-enhance","v-prompt");
 /* ================= Image ================= */
 const iCanvas=document.getElementById("i-canvas"),iDownload=document.getElementById("i-download"),iVariant=document.getElementById("i-variant");
 async function generateImage(seed){
+  if(state.image.photo){ restylePhoto(); return; }
   const base=document.getElementById("i-prompt").value.trim();
   if(!base){document.getElementById("i-prompt").focus();return;}
   if(!canAfford(COST.image)){ notEnough(); return; }
@@ -552,7 +567,7 @@ async function generateImage(seed){
       const grid=iCanvas.querySelector(".batch-grid");
       imgs.forEach((im,k)=>{ const u=imgURL(prompt,dims,model,seeds[k]); im.title="Скачать"; im.onclick=()=>downloadImage(u,`halo-${Date.now()}-${k}.jpg`); grid.appendChild(im); addToGallery(u,prompt); });
       state.image.url=imgURL(prompt,dims,model,seeds[0]);
-      iDownload.disabled=false; iVariant.disabled=false; go.disabled=false; await spend(COST.image); maybeShowInterstitial();
+      iDownload.disabled=false; iVariant.disabled=false; iShare.disabled=false; iUpscale.disabled=false; go.disabled=false; await spend(COST.image); maybeShowInterstitial();
     }catch(e){ showError(iCanvas,"Не удалось создать изображения. Кредит не списан."); go.disabled=false; }
     return;
   }
@@ -560,7 +575,7 @@ async function generateImage(seed){
   showLoading(iCanvas,"Создаю изображение…");
   const url=imgURL(prompt,dims,model,seed);
   const img=new Image(); img.crossOrigin="anonymous";
-  img.onload=async()=>{ iCanvas.innerHTML=""; iCanvas.appendChild(img); state.image.url=url; iDownload.disabled=false; iVariant.disabled=false; go.disabled=false; await spend(COST.image); addToGallery(url,prompt); maybeShowInterstitial(); };
+  img.onload=async()=>{ iCanvas.innerHTML=""; iCanvas.appendChild(img); state.image.url=url; iDownload.disabled=false; iVariant.disabled=false; iShare.disabled=false; iUpscale.disabled=false; go.disabled=false; await spend(COST.image); addToGallery(url,prompt); maybeShowInterstitial(); };
   img.onerror=()=>{ showError(iCanvas,"Не удалось загрузить изображение. Попробуй ещё раз — кредит не списан."); go.disabled=false; };
   img.src=url;
 }
@@ -596,6 +611,56 @@ async function downloadImage(url,name){
   }catch(e){ downloadURL(url,name); }
 }
 iDownload.onclick=()=>{ if(state.image.url) downloadImage(state.image.url,`halo-${Date.now()}.jpg`); };
+const iShare=document.getElementById("i-share"), iUpscale=document.getElementById("i-upscale");
+const iPhotoInput=document.getElementById("i-photo"), iPhotoBtn=document.getElementById("i-photo-btn");
+function showImageResult(url){
+  const img=new Image(); img.crossOrigin="anonymous";
+  img.onload=()=>{ iCanvas.innerHTML=""; iCanvas.appendChild(img); }; img.src=url; state.image.url=url;
+  iDownload.disabled=false; iVariant.disabled=false; iShare.disabled=false; iUpscale.disabled=false;
+}
+function shareToTelegram(url){
+  const link = tgUser ? `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=ref_${tgUser.id}` : `https://t.me/${BOT_USERNAME}/${APP_NAME}`;
+  openLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("Сделано в HALO Studio ✨\n\nСоздай своё: "+link)}`);
+}
+iShare.onclick=()=>{ if(state.image.url) shareToTelegram(state.image.url); };
+iUpscale.onclick=async()=>{
+  if(!state.image.url) return;
+  if(!serverMode){ toast("Апскейл работает в Telegram с сервером."); return; }
+  iUpscale.disabled=true; showLoading(iCanvas,"Увеличиваю до HD… это до минуты");
+  try{
+    const d=await serverCall("/api/upscale",{ image:state.image.url, scale:2 });
+    if(!d.ok){ if(d.error==="pro_required"){ toast("Апскейл — только в PRO"); openStore(); } else if(d.error==="need_paid"){ toast("Апскейл — за купленные кредиты 💎"); openStore(); } else toast("Не удалось увеличить."); showImageResult(state.image.url); iUpscale.disabled=false; return; }
+    const url=await pollVideo(d.id);
+    if(url){ showImageResult(url); addToGallery(url,"HD"); toast("Готово в HD!", true); syncCredits(); } else { toast("Не получилось."); showImageResult(state.image.url); }
+  }catch(e){ toast("Ошибка апскейла."); showImageResult(state.image.url); }
+  iUpscale.disabled=false;
+};
+async function restylePhoto(){
+  const base=document.getElementById("i-prompt").value.trim();
+  if(!base){ document.getElementById("i-prompt").focus(); toast("Опиши, во что переделать фото"); return; }
+  if(!serverMode){ toast("Переделка фото работает в Telegram с сервером."); return; }
+  const go=document.getElementById("i-go"); go.disabled=true; iDownload.disabled=true; iVariant.disabled=true; iShare.disabled=true; iUpscale.disabled=true;
+  showLoading(iCanvas,"Переделываю фото… это до минуты");
+  try{
+    const d=await serverCall("/api/restyle",{ image:state.image.photo, prompt:base });
+    if(!d.ok){
+      if(d.error==="pro_required"){ showError(iCanvas,"Переделка фото — только в PRO."); openStore(); }
+      else if(d.error==="need_paid"){ showError(iCanvas,"Переделка — за купленные кредиты 💎."); openStore(); }
+      else showError(iCanvas,"Не удалось переделать фото.");
+      go.disabled=false; return;
+    }
+    const url=await pollVideo(d.id);
+    if(url){ showImageResult(url); addToGallery(url,base); syncCredits(); } else showError(iCanvas,"Не получилось. Попробуй ещё раз.");
+  }catch(e){ showError(iCanvas,"Ошибка переделки."); }
+  go.disabled=false;
+}
+iPhotoBtn.onclick=()=>iPhotoInput.click();
+iPhotoInput.onchange=async()=>{
+  const f=iPhotoInput.files&&iPhotoInput.files[0]; if(!f)return;
+  try{ const u=await downscaleImage(f,1024); state.image.photo=u; document.getElementById("i-photo-img").src=u; document.getElementById("i-photo-prev").style.display=""; iPhotoBtn.textContent="📷 Заменить фото"; document.getElementById("i-prompt").placeholder="Во что переделать? напр.: сделай в стиле аниме / Pixar / киберпанк"; }
+  catch(e){ toast("Не удалось загрузить фото"); }
+};
+document.getElementById("i-photo-x").onclick=()=>{ state.image.photo=null; document.getElementById("i-photo-prev").style.display="none"; iPhotoInput.value=""; iPhotoBtn.textContent="📷 Загрузить фото для переделки"; document.getElementById("i-prompt").placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…"; };
 
 /* ================= Gallery (persistent) ================= */
 function addToGallery(url,prompt){ state.gallery.unshift({url,prompt}); if(state.gallery.length>30) state.gallery.length=30; persist.set("halo_gallery",state.gallery); renderGallery(); }
@@ -627,6 +692,9 @@ const TEMPLATES=[
   {name:"Мультгерой",emo:"🧸",desc:"3D-мультик 1:1",target:"image",ratio:"1024x1024",styles:["Мультфильм"],prompt:"cute 3D animated cartoon character, big expressive eyes, friendly smile, soft studio lighting, colorful, Pixar-like, high detail"},
   {name:"2D-персонаж",emo:"🎨",desc:"2D-мультик 9:16",target:"image",ratio:"720x1280",styles:["2D-анимация"],prompt:"2D cartoon character full body, bold clean outlines, flat vibrant colors, playful pose, simple background"},
   {name:"Мультклип",emo:"📺",desc:"Мультик-видео",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"animated cartoon scene, cute characters, lively motion, colorful magical world, Pixar-style 3D animation"},
+  {name:"Мультик о животных",emo:"🦊",desc:"Видео-мультик",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"cute cartoon animal character in a colorful forest, playful movement, Pixar-style 3D animation, warm lighting, family friendly"},
+  {name:"Сказка",emo:"🏰",desc:"Видео-мультик",target:"video",ratio:"1280x720",styles:["Мультфильм","Фэнтези"],prompt:"magical fairytale cartoon scene, enchanted castle, sparkling atmosphere, storybook 3D animation, whimsical characters"},
+  {name:"Детская история",emo:"🧒",desc:"Видео-мультик",target:"video",ratio:"720x1280",styles:["2D-анимация"],prompt:"cheerful 2D cartoon for kids, simple bold shapes, bright happy colors, friendly character, storybook animation style"},
   {name:"Мультфильм-кадр",emo:"🎨",desc:"Кадр 16:9",target:"image",ratio:"1280x720",styles:["Мультфильм"],prompt:"cartoon movie still, cute expressive character, colorful whimsical scene, cinematic lighting, Pixar Disney 3D style, high detail"},
   {name:"2D-персонаж",emo:"✏️",desc:"Герой 9:16",target:"image",ratio:"720x1280",styles:["2D-анимация"],prompt:"2D animated cartoon character, full body, dynamic playful pose, bold clean outlines, vibrant flat colors"},
   {name:"Мультклип",emo:"🎞️",desc:"Видео-сцена",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"animated cartoon scene, cute characters moving, colorful lively environment, Pixar 3D style, smooth playful motion"},
@@ -704,6 +772,11 @@ async function buildVideo(){
   }
   state.video.frames=frames;
   await spend(COST.video);
+  await renderClip(frames,W,H);
+  go.disabled=false; vReplay.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; maybeShowInterstitial();
+}
+async function renderClip(frames, W, H){
+  state.video.frames=frames;
   const cv=document.createElement("canvas"); const scale=Math.min(1,900/W); cv.width=Math.round(W*scale); cv.height=Math.round(H*scale);
   vCanvasWrap.innerHTML=""; vCanvasWrap.appendChild(cv); const ctx=cv.getContext("2d");
   let recorder=null, chunks=[];
@@ -721,6 +794,30 @@ async function buildVideo(){
     recorder.start();
   }catch(e){ recorder=null; }
   await playSequence(ctx,cv,frames,()=>{ if(recorder&&recorder.state==="recording") recorder.stop(); });
+}
+// Раскадровка: мини-мультфильм из нескольких сцен (по строке на сцену), склейка на клиенте
+async function buildStoryboard(){
+  const raw=document.getElementById("v-prompt").value.trim();
+  const scenes=raw.split("\n").map(s=>s.trim()).filter(Boolean).slice(0,6);
+  if(!scenes.length){ document.getElementById("v-prompt").focus(); toast("Впиши сцены — по одной в строке"); return; }
+  if(!canAfford(COST.video)){ notEnough(); return; }
+  const dims=scaleDims(document.getElementById("v-ratio").value, proState.vhd); const [W,H]=dims.split("x").map(Number);
+  const styleKw=[...state.video.styles].join(", ");
+  const go=document.getElementById("v-go"); go.disabled=true; vDownload.disabled=true; vReplay.disabled=true;
+  document.getElementById("v-mp4").style.display="none"; state.video.aiUrl=null;
+  vStatus.innerHTML=`<span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>рендер`;
+  const cartoon="cartoon, animated, Pixar style, vibrant, storybook, family friendly";
+  const frames=[];
+  for(let i=0;i<scenes.length;i++){
+    showLoading(vCanvasWrap,`Сцена ${i+1} из ${scenes.length}…`);
+    const p=`${scenes[i]}, ${cartoon}${styleKw?", "+styleKw:""}`;
+    try{
+      frames.push(await loadImg(imgURL(p+", wide shot",dims,"flux",2000+i*53)));
+      frames.push(await loadImg(imgURL(p+", closer shot",dims,"flux",2000+i*53+7)));
+    }catch(e){ showError(vCanvasWrap,"Не удалось создать сцены. Кредиты не списаны."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return; }
+  }
+  await spend(COST.video);
+  await renderClip(frames,W,H);
   go.disabled=false; vReplay.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; maybeShowInterstitial();
 }
 function playSequence(ctx,cv,frames,onDone){
@@ -742,7 +839,7 @@ function playSequence(ctx,cv,frames,onDone){
     requestAnimationFrame(loop);
   });
 }
-document.getElementById("v-go").onclick=()=>{ if(videoMode==="ai") buildAIVideo(); else buildVideo(); };
+document.getElementById("v-go").onclick=()=>{ if(videoMode==="ai") buildAIVideo(); else if(videoMode==="story") buildStoryboard(); else buildVideo(); };
 vReplay.onclick=()=>{ if(!state.video.frames.length)return; const cv=vCanvasWrap.querySelector("canvas"); if(cv){ playSequence(cv.getContext("2d"),cv,state.video.frames,null); } };
 vDownload.onclick=()=>{
   if(state.video.aiUrl){ downloadURL(state.video.aiUrl,`halo-clip-${Date.now()}.mp4`); return; }
@@ -757,8 +854,11 @@ document.querySelectorAll("#v-mode .seg-btn").forEach(b=>{
     document.querySelectorAll("#v-mode .seg-btn").forEach(x=>x.classList.remove("on"));
     b.classList.add("on"); videoMode=b.dataset.mode;
     document.getElementById("v-ai-opts").style.display = videoMode==="ai" ? "" : "none";
-    document.getElementById("v-frames-cell").style.display = videoMode==="ai" ? "none" : "";
+    document.getElementById("v-frames-cell").style.display = (videoMode==="ai"||videoMode==="story") ? "none" : "";
     document.getElementById("v-hd-wrap").style.display = videoMode==="ai" ? "none" : "";
+    const vp=document.getElementById("v-prompt");
+    if(videoMode==="story"){ vp.placeholder="Опиши сцены — по одной в строке:\nМальчик находит волшебный камень\nКамень светится, появляется дракон\nОни летят над степью на закате"; }
+    else{ vp.placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…"; }
     setVideoCostBadge();
   };
 });
@@ -792,7 +892,7 @@ vPhotoInput.onchange=async()=>{
   vPhotoInput.value=""; renderPhotos();
   if(state.video.photos.length>1 && document.getElementById("v-aimodel").value!=="seedance2"){ toast("Несколько фото и режимы — на модели Seedance 2.0"); }
 };
-const AI_COST = { veo3:15, kling:10, seedance:10, seedance2:15 };
+const AI_COST = { veo3:15, kling:10, seedance:10, seedance2:15, hailuo:8, luma:12 };
 function aiCost(){ return AI_COST[document.getElementById("v-aimodel").value] || 10; }
 function setVideoCostBadge(){
   const c=document.querySelector("#v-go .cost"); if(!c) return;
@@ -802,8 +902,10 @@ function setVideoCostBadge(){
 function updateAiControls(){
   const model=document.getElementById("v-aimodel").value;
   const dur=document.getElementById("v-aidur");
-  const opts = model==="veo3" ? [[4,"4 секунды"],[6,"6 секунд"],[8,"8 секунд"]] : [[5,"5 секунд"],[10,"10 секунд"]];
-  const def  = model==="veo3" ? 8 : 5;
+  let opts, def;
+  if(model==="veo3"){ opts=[[4,"4 секунды"],[6,"6 секунд"],[8,"8 секунд"]]; def=8; }
+  else if(model==="hailuo"){ opts=[[6,"6 секунд"],[10,"10 секунд"]]; def=6; }
+  else { opts=[[5,"5 секунд"],[10,"10 секунд"]]; def=5; }
   dur.innerHTML=opts.map(([v,l])=>`<option value="${v}"${v===def?" selected":""}>${l}</option>`).join("");
   document.getElementById("v-audio-row").style.display = (model==="veo3"||model==="seedance2") ? "" : "none";
   setVideoCostBadge();
@@ -887,7 +989,39 @@ vMp4.onclick=async()=>{
   }catch(e){ toast("MP4-конвертация недоступна в этом окружении — сохрани WebM."); }
   vMp4.innerHTML=orig; vMp4.disabled=false;
 };
-/* ================= Store · Partner · Telegram Stars ================= */
+/* ================= Язык: РУС / ҚАЗ ================= */
+const KZ = {
+  "Изображение":"Сурет","Видео":"Бейне","Шаблоны":"Үлгілер","Галерея":"Галерея",
+  "Параметры":"Параметрлер","Результат":"Нәтиже","Параметры клипа":"Клип параметрлері","Клип":"Клип",
+  "Опиши, что создать":"Не жасау керегін жаз","Переделать своё фото (по описанию)":"Өз фотоңды өзгерту",
+  "Стиль":"Стиль","Формат":"Формат","Движок":"Қозғалтқыш","PRO-функции":"PRO-функциялар",
+  "Опиши сцену":"Сахнаны сипатта","Модель AI-видео":"AI-бейне моделі","Длина клипа":"Клип ұзақтығы","Звук":"Дыбыс",
+  "Своё фото — оживить (ты в кадре)":"Өз фотоң — жандандыру","Режим фото (Seedance 2.0)":"Фото режимі (Seedance 2.0)","Кадров":"Кадрлар",
+  "Слайд-шоу · free":"Слайд-шоу · тегін","🎬 Мультфильм":"🎬 Мультфильм","AI-видео · PRO":"AI-бейне · PRO",
+  "Сгенерировать":"Жасау","Собрать клип":"Клип жинау","Скачать":"Жүктеу","Скачать видео":"Бейнені жүктеу",
+  "Вариация":"Нұсқа","Поделиться":"Бөлісу","Заново":"Қайта",
+  "Улучшить промпт через AI":"Промптты AI-мен жақсарту","📷 Загрузить фото для переделки":"📷 Өзгертуге фото жүктеу",
+  "Звук вкл":"Дыбыс қосулы","Своё фото — оживить (ты в кадре)":"Өз фотоң — жандандыру"
+};
+const PH_KZ = {
+  "i-prompt":"ай астындағы кратерде кофе ішкен ғарышкер…",
+  "v-prompt":"алтын жарықтағы қазақ домбырасы, кинематографиялық…"
+};
+let lang = persist.get("halo_lang", (tgUser && /^kk|^kz/i.test(tgUser.language_code||"")) ? "kz" : "ru");
+function i18nNode(el){ for(const n of el.childNodes){ if(n.nodeType===3 && n.nodeValue.trim()) return n; } return null; }
+function i18nText(el){ const n=i18nNode(el); return (n? n.nodeValue.trim() : el.textContent.trim()); }
+function i18nSet(el, txt){ const n=i18nNode(el); if(n){ n.nodeValue = txt + (n.nextElementSibling? " ":""); } else if(!el.children.length){ el.textContent=txt; } }
+function applyLang(){
+  document.querySelectorAll(".tab, .panel h2, .stage-head h2, .fld, .seg-btn, .btn-ghost, #i-go, #v-go, #i-enhance, #v-enhance, #i-photo-btn, #v-aiaudio").forEach(el=>{
+    if(el.dataset.ru===undefined) el.dataset.ru=i18nText(el);
+    const ru=el.dataset.ru;
+    i18nSet(el, (lang==="kz" && KZ[ru]) ? KZ[ru] : ru);
+  });
+  for(const id in PH_KZ){ const el=document.getElementById(id); if(!el) continue; if(el.dataset.ru===undefined) el.dataset.ru=el.getAttribute("placeholder")||""; el.setAttribute("placeholder", lang==="kz"?PH_KZ[id]:el.dataset.ru); }
+  const lb=document.getElementById("lang-btn"); if(lb) lb.textContent = lang==="kz" ? "РУС" : "ҚАЗ";
+}
+document.getElementById("lang-btn").onclick=()=>{ lang = lang==="kz" ? "ru" : "kz"; persist.set("halo_lang", lang); applyLang(); };
+applyLang();
 function openLink(url){ try{ if(tg && tg.openLink){ tg.openLink(url); return; } }catch(e){} window.open(url,"_blank"); }
 document.getElementById("partner-btn").onclick=()=>openLink(AFFILIATE_URL);
 document.getElementById("store-partner").onclick=()=>openLink(AFFILIATE_URL);
@@ -918,6 +1052,7 @@ function updateStoreUI(){
   if(inv) inv.textContent = refCount ? `👥 Пригласить друга · +20⚡ (друзей: ${refCount})` : "👥 Пригласить друга · +20⚡";
 }
 function refLink(){ return `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=ref_${tgUser?tgUser.id:""}`; }
+document.getElementById("v-share").onclick=()=>{ openLink(`https://t.me/share/url?url=${encodeURIComponent(refLink())}&text=${encodeURIComponent("HALO Studio — AI фото и видео прямо в Telegram ✨")}`); };
 document.getElementById("store-invite").onclick=()=>{
   const link=refLink(), text="Заходи в HALO AI Studio — генерируй фото и видео!";
   openLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
