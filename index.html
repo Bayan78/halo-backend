@@ -392,7 +392,7 @@ const DEV_PRO    = false;        // true = включить PRO при тест�
 const AFFILIATE_URL = "https://bayanchatbot.netlify.app"; // ссылка кнопки «Партнёрам» — подставь свою
 const BOT_USERNAME  = "HALOStudiobot"; // юзернейм бота Mini App (без @) — для реферальной ссылки
 const APP_NAME      = "studio";   // короткое имя Mini App из BotFather (t.me/HALOStudiobot/studio)
-let userPro = false, bonusReady = false, refCount = 0, serverOwner = false;
+let userPro = false, bonusReady = false, refCount = 0, serverOwner = false, disabledModels = [];
 function ownerFree(){ return isOwner || serverOwner; }  // владелец или из белого списка сервера
 
 const tgUser  = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
@@ -426,9 +426,10 @@ async function syncCredits(){
     if(typeof d.free === "number") credits = d.free;
     if(typeof d.paid === "number") paidCredits = d.paid;
     userPro = !!d.pro; bonusReady = !!d.bonus; refCount = d.referrals || 0;
+    disabledModels = Array.isArray(d.disabled) ? d.disabled : [];
     serverOwner = !!d.owner;
     isPro = isOwner || DEV_PRO || userPro || serverOwner;
-    refreshPro(); setVideoCostBadge(); updateStoreUI();
+    refreshPro(); setVideoCostBadge(); updateStoreUI(); if(typeof renderModels==="function") renderModels();
   }catch(e){}
   renderCredits();
 }
@@ -601,7 +602,7 @@ function drawWatermark(ctx,w,h){
 }
 function isClean(){ return ownerFree() || isPro; }   // чистый файл — PRO/владельцу
 async function downloadImage(url,name){
-  if(isClean()) return downloadURL(url,name);
+  if(isClean()) return tgDownload(url,name);
   try{
     const im=await loadImg(url);
     const w=im.naturalWidth||im.width, h=im.naturalHeight||im.height;
@@ -841,9 +842,16 @@ function playSequence(ctx,cv,frames,onDone){
 }
 document.getElementById("v-go").onclick=()=>{ if(videoMode==="ai") buildAIVideo(); else if(videoMode==="story") buildStoryboard(); else buildVideo(); };
 vReplay.onclick=()=>{ if(!state.video.frames.length)return; const cv=vCanvasWrap.querySelector("canvas"); if(cv){ playSequence(cv.getContext("2d"),cv,state.video.frames,null); } };
+function tgDownload(url, name){
+  try{ if(tg && typeof tg.downloadFile==="function"){ tg.downloadFile({ url, file_name:name }, ()=>{}); return true; } }catch(e){}
+  try{ if(tg && typeof tg.openLink==="function"){ tg.openLink(url); return true; } }catch(e){}
+  downloadURL(url,name); return true;
+}
 vDownload.onclick=()=>{
-  if(state.video.aiUrl){ downloadURL(state.video.aiUrl,`halo-clip-${Date.now()}.mp4`); return; }
-  if(!state.video.blob)return; const u=URL.createObjectURL(state.video.blob); const a=document.createElement("a"); a.href=u; a.download=`halo-clip-${Date.now()}.${state.video.ext||"webm"}`; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000);
+  if(state.video.aiUrl){ tgDownload(state.video.aiUrl,`halo-clip-${Date.now()}.mp4`); return; }
+  if(!state.video.blob)return;
+  const u=URL.createObjectURL(state.video.blob); const a=document.createElement("a"); a.href=u; a.download=`halo-clip-${Date.now()}.${state.video.ext||"webm"}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),4000);
+  if(tg && tg.platform && tg.platform!=="unknown") toast("Если не скачалось — открой ⋮ → «Открыть в браузере» и сохрани оттуда.");
 };
 
 /* ---- Video mode toggle (slideshow / AI) ---- */
@@ -893,6 +901,21 @@ vPhotoInput.onchange=async()=>{
   if(state.video.photos.length>1 && document.getElementById("v-aimodel").value!=="seedance2"){ toast("Несколько фото и режимы — на модели Seedance 2.0"); }
 };
 const AI_COST = { veo3:15, kling:10, seedance:10, seedance2:15, hailuo:8, luma:12 };
+const AI_MODELS = [
+  {v:"kling",     label:"Kling 2.1 · кинематографично, 1080p", premium:false},
+  {v:"seedance",  label:"Seedance Pro · выгодно, 1080p",       premium:false},
+  {v:"hailuo",    label:"Hailuo 2 · оживление фото, дёшево",   premium:false},
+  {v:"veo3",      label:"Veo 3.1 · со звуком, 16:9/9:16",      premium:true},
+  {v:"seedance2", label:"Seedance 2.0 · мультифото/сцена",     premium:true},
+  {v:"luma",      label:"Luma Ray · плавно, фото/текст",       premium:true}
+];
+function renderModels(){
+  const sel=document.getElementById("v-aimodel"); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML=AI_MODELS.filter(m=>!disabledModels.includes(m.v) && (!m.premium || ownerFree())).map(m=>`<option value="${m.v}">${m.label}${m.premium?" · Premium":""}</option>`).join("");
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  updateAiControls();
+}
 function aiCost(){ return AI_COST[document.getElementById("v-aimodel").value] || 10; }
 function setVideoCostBadge(){
   const c=document.querySelector("#v-go .cost"); if(!c) return;
@@ -911,7 +934,7 @@ function updateAiControls(){
   setVideoCostBadge();
 }
 document.getElementById("v-aimodel").onchange=updateAiControls;
-updateAiControls();
+renderModels();
 { const ic=document.querySelector("#i-go .cost"); if(ic) ic.textContent = ownerFree() ? "· ∞" : "· 1⚡"; }
 setVideoCostBadge();
 
@@ -937,6 +960,8 @@ async function buildAIVideo(){
     const d=await serverCall("/api/video/generate", payload);
     if(!d.ok){
       if(d.error==="pro_required"){ showError(vCanvasWrap,"AI-видео доступно только в PRO."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; openStore(); return; }
+      if(d.error==="premium_only"){ showError(vCanvasWrap,"Эта модель доступна только владельцу. Выбери Kling, Seedance Pro или Hailuo."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return; }
+      if(d.error==="model_disabled"){ showError(vCanvasWrap,"Эта модель временно отключена. Выбери другую."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return; }
       if(d.error==="need_paid"){ if(typeof d.paid==="number"){paidCredits=d.paid;renderCredits();} showError(vCanvasWrap,"AI-видео — только за купленные кредиты 💎."); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; openStore(); return; }
       if(typeof d.credits==="number"){credits=d.credits;renderCredits();} showError(vCanvasWrap,"Не хватает кредитов для AI-видео."); notEnough(); go.disabled=false; vStatus.innerHTML=`<span class="dot"></span>готов`; return;
     }

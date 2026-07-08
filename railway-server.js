@@ -45,6 +45,10 @@ const GROQ_API_KEY   = process.env.GROQ_API_KEY || "";           // ключ Gro
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";         // ключ Google Gemini (основной, с фолбэком на Groq)
 const ADMIN_KEY      = process.env.ADMIN_KEY || "";              // ключ для доступа к /admin (задай свой)
 const APP_URL        = process.env.APP_URL || "https://halo-backend-production-44c1.up.railway.app/app"; // ссылка Mini App для кнопки /start
+// Дорогие модели — только владельцу/«своим» (чтобы чужие не сожгли баланс Replicate)
+const PREMIUM_MODELS = new Set(String(process.env.PREMIUM_MODELS || "veo3,seedance2,luma").split(",").map(s => s.trim()).filter(Boolean));
+// Полностью скрытые модели (для всех, включая владельца). Очисти переменную в Railway, чтобы вернуть.
+const DISABLED_MODELS = new Set(String(process.env.DISABLED_MODELS || "veo3,seedance2,luma").split(",").map(s => s.trim()).filter(Boolean));
 
 // --- Видео-API (генеративное видео) ---
 const REPLICATE_TOKEN = process.env.REPLICATE_TOKEN || "";        // ключ Replicate (r8_...)
@@ -251,7 +255,8 @@ app.post("/api/credits", (req, res) => {
     pro: isProUser(u.id),
     pro_until: r.pro_until || 0,
     bonus: bonusAvailable(u.id),
-    referrals: r.referrals || 0
+    referrals: r.referrals || 0,
+    disabled: [...DISABLED_MODELS]
   });
 });
 
@@ -295,6 +300,8 @@ app.post("/api/video/generate", async (req, res) => {
   if (!prompt && images.length) prompt = "cinematic subtle natural motion, smooth camera movement";
   if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "video api not configured" });
   if (!isProUser(u.id)) return res.json({ ok: false, error: "pro_required" }); // AI-видео — только PRO
+  if (DISABLED_MODELS.has(req.body.model)) return res.json({ ok: false, error: "model_disabled" }); // временно отключена
+  if (PREMIUM_MODELS.has(req.body.model) && !isOwnerId(u.id)) return res.json({ ok: false, error: "premium_only" }); // дорогие модели — только владелец/свои
 
   const cost = videoCost(req.body.model); // цена зависит от модели (Veo дороже)
   // AI-видео — только за КУПЛЕННЫЕ кредиты (владельцу бесплатно)
