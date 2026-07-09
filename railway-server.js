@@ -353,10 +353,12 @@ app.post("/api/restyle", async (req, res) => {
   if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "no api" });
   const cost = Number(process.env.COST_RESTYLE || 4);
   if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
+  // Kontext лучше слушается инструкции-команды: «преврати это фото в …, сохранив лицо»
+  const editPrompt = `Transform this photo: ${prompt}. Keep the person's face and identity recognizable, change the clothing, background and lighting to match the description. Photorealistic, high detail.`;
   try {
     const rr = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
       method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ input: { prompt, input_image: image } })
+      body: JSON.stringify({ input: { prompt: editPrompt, input_image: image, output_format: "jpg", safety_tolerance: 2 } })
     });
     const d = await rr.json();
     if (!rr.ok || !d.id) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
