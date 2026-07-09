@@ -353,12 +353,21 @@ app.post("/api/restyle", async (req, res) => {
   if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "no api" });
   const cost = Number(process.env.COST_RESTYLE || 4);
   if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
-  // Kontext лучше слушается инструкции-команды: «преврати это фото в …, сохранив лицо»
-  const editPrompt = `Transform this photo: ${prompt}. Keep the person's face and identity recognizable, change the clothing, background and lighting to match the description. Photorealistic, high detail.`;
+  // Инструкцию переводим на английский — Kontext точнее её понимает (иначе «казахский костюм» → кимоно)
+  const en = await translateEdit(prompt);
+  // Формулируем как минимальную правку: менять только одежду/фон, лицо не трогать
+  const editPrompt = `${en}. Keep the exact same person: identical face, facial features, eyes, nose, mouth, skin tone, hairstyle and age. Do not change the person's identity or face. Preserve the original pose and framing. Only modify what is requested.`;
   try {
     const rr = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
       method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ input: { prompt: editPrompt, input_image: image, output_format: "jpg", safety_tolerance: 2 } })
+      body: JSON.stringify({ input: {
+        prompt: editPrompt,
+        input_image: image,
+        aspect_ratio: "match_input_image", // не перекадрировать → лицо стабильнее
+        prompt_upsampling: false,          // не переписывать промпт (иначе «уплывает» личность)
+        output_format: "jpg",
+        safety_tolerance: 2
+      } })
     });
     const d = await rr.json();
     if (!rr.ok || !d.id) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
@@ -479,6 +488,33 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
 // Улучшение промпта: сначала Gemini, если не вышло — Groq. Оба на сервере, работают без VPN.
 const ENHANCE_PROMPT = (text) => `Ты — эксперт по промптам для AI-генерации фото и видео. Перепиши идею в один яркий детальный промпт на английском (40-70 слов): конкретный субъект, окружение, освещение, ракурс камеры, настроение, художественный стиль. Сохрани имена собственные и казахские/национальные слова и детали как есть (при необходимости латинской транслитерацией). Выведи ТОЛЬКО текст промпта — без кавычек и пояснений.\n\nИдея: ${text}`;
+
+// Перевод инструкции редактирования фото на английский (короткая команда, без фантазий)
+const EDIT_TR_PROMPT = (text) => `Translate this photo-editing instruction into a short English command for an image editing model. Keep it literal and specific. If national clothing or places are mentioned, name them explicitly in English (e.g. Kazakh chapan robe, embroidered takiya cap, Alatau mountains). Do NOT describe the person's face or appearance. Output ONLY the command.\n\nInstruction: ${text}`;
+async function translateEdit(text){
+  if (/^[\x00-\x7F\s.,!?'"()-]+$/.test(text)) return text; // уже английский
+  try {
+    if (GEMINI_API_KEY) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: EDIT_TR_PROMPT(text) }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 120 } })
+      });
+      const d = await r.json();
+      const out = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (out) return out.trim();
+    }
+    if (GROQ_API_KEY) {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", headers: { "Authorization": "Bearer " + GROQ_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0.2, max_tokens: 120, messages: [{ role: "user", content: EDIT_TR_PROMPT(text) }] })
+      });
+      const d = await r.json();
+      const out = d?.choices?.[0]?.message?.content;
+      if (out) return out.trim();
+    }
+  } catch (e) {}
+  return text;
+}
 
 async function enhanceGemini(text){
   if (!GEMINI_API_KEY) return null;

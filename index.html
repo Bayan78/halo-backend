@@ -551,7 +551,9 @@ async function enhance(text){
   return data.content.filter(i=>i.type==="text").map(i=>i.text).join("").trim();
 }
 function wireEnhance(btnId,taId){ const btn=document.getElementById(btnId),ta=document.getElementById(taId);
-  btn.onclick=async()=>{ const t=ta.value.trim(); if(!t)return; const orig=btn.innerHTML; btn.disabled=true; btn.textContent="Улучшаю…";
+  btn.onclick=async()=>{ const t=ta.value.trim(); if(!t)return;
+    if(btnId==="i-enhance" && typeof imageMode!=="undefined" && imageMode==="edit"){ toast("В режиме «Переделать фото» пиши инструкцию простыми словами — улучшение не нужно."); return; }
+    const orig=btn.innerHTML; btn.disabled=true; btn.textContent="Улучшаю…";
     try{ ta.value=await enhance(t); }catch(e){ btn.textContent="Не вышло, попробуй ещё"; setTimeout(()=>btn.innerHTML=orig,1600); btn.disabled=false; return; } btn.innerHTML=orig; btn.disabled=false; }; }
 wireEnhance("i-enhance","i-prompt"); wireEnhance("v-enhance","v-prompt");
 
@@ -666,7 +668,7 @@ async function restylePhoto(){
 iPhotoBtn.onclick=()=>iPhotoInput.click();
 iPhotoInput.onchange=async()=>{
   const f=iPhotoInput.files&&iPhotoInput.files[0]; if(!f)return;
-  try{ const u=await downscaleImage(f,1024); state.image.photo=u; document.getElementById("i-photo-img").src=u; document.getElementById("i-photo-prev").style.display=""; iPhotoBtn.textContent="📷 Заменить фото"; document.getElementById("i-mode-row").style.display=""; setImageMode("edit"); }
+  try{ const u=await downscaleImage(f,1280); state.image.photo=u; document.getElementById("i-photo-img").src=u; document.getElementById("i-photo-prev").style.display=""; iPhotoBtn.textContent="📷 Заменить фото"; document.getElementById("i-mode-row").style.display=""; setImageMode("edit"); }
   catch(e){ toast("Не удалось загрузить фото"); }
 };
 function setImageMode(m){
