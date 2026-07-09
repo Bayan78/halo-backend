@@ -236,8 +236,9 @@
         <div class="seg" id="i-mode" style="margin-top:12px">
           <button class="seg-btn on" data-imode="new">✨ Создать новое</button>
           <button class="seg-btn" data-imode="edit">🖌 Переделать фото</button>
+          <button class="seg-btn" data-imode="face">🧍 Я в кадре</button>
         </div>
-        <div class="hint" style="font-size:11.5px;color:var(--muted-dim);margin-top:8px">«Переделать» меняет твоё фото по описанию (лицо сохраняется). «Создать новое» — рисует картинку с нуля по промпту.</div>
+        <div class="hint" style="font-size:11.5px;color:var(--muted-dim);margin-top:8px">«Переделать» правит твоё фото (одежда/фон). «Я в кадре» — рисует новую сцену с твоим лицом. «Создать новое» — картинка с нуля.<br>Для точного лица: чёткое фронтальное фото, хороший свет.</div>
       </div>
       <label class="fld">Стиль</label>
       <div class="chips" id="i-styles"></div>
@@ -562,6 +563,7 @@ const iCanvas=document.getElementById("i-canvas"),iDownload=document.getElementB
 let imageMode="new";
 async function generateImage(seed){
   if(state.image.photo && imageMode==="edit"){ restylePhoto(); return; }
+  if(state.image.photo && imageMode==="face"){ faceShot(); return; }
   const base=document.getElementById("i-prompt").value.trim();
   if(!base){document.getElementById("i-prompt").focus();return;}
   if(!canAfford(COST.image)){ notEnough(); return; }
@@ -671,13 +673,32 @@ iPhotoInput.onchange=async()=>{
   try{ const u=await downscaleImage(f,1280); state.image.photo=u; document.getElementById("i-photo-img").src=u; document.getElementById("i-photo-prev").style.display=""; iPhotoBtn.textContent="📷 Заменить фото"; document.getElementById("i-mode-row").style.display=""; setImageMode("edit"); }
   catch(e){ toast("Не удалось загрузить фото"); }
 };
+async function faceShot(){
+  const base=document.getElementById("i-prompt").value.trim();
+  if(!base){ document.getElementById("i-prompt").focus(); toast("Опиши сцену, в которой хочешь оказаться"); return; }
+  if(!serverMode){ toast("«Я в кадре» работает в Telegram с сервером."); return; }
+  const go=document.getElementById("i-go"); go.disabled=true; iDownload.disabled=true; iVariant.disabled=true; iShare.disabled=true; iUpscale.disabled=true;
+  showLoading(iCanvas,"Помещаю тебя в сцену… это до минуты");
+  try{
+    const d=await serverCall("/api/faceshot",{ image:state.image.photo, prompt:base, id_weight:1.2 });
+    if(!d.ok){
+      if(d.error==="pro_required"){ showError(iCanvas,"«Я в кадре» — только в PRO."); openStore(); }
+      else if(d.error==="need_paid"){ showError(iCanvas,"«Я в кадре» — за купленные кредиты 💎."); openStore(); }
+      else showError(iCanvas,"Не удалось создать сцену.");
+      go.disabled=false; return;
+    }
+    const url=await pollVideo(d.id);
+    if(url){ showImageResult(url); addToGallery(url,base); syncCredits(); } else showError(iCanvas,"Не получилось. Попробуй ещё раз.");
+  }catch(e){ showError(iCanvas,"Ошибка генерации."); }
+  go.disabled=false;
+}
 function setImageMode(m){
   imageMode=m;
   document.querySelectorAll("#i-mode .seg-btn").forEach(b=>b.classList.toggle("on", b.dataset.imode===m));
   const p=document.getElementById("i-prompt");
-  p.placeholder = m==="edit"
-    ? "Что изменить? напр.: надень традиционный казахский костюм, фон — горы Алатау"
-    : "космонавт пьёт кофе на краю кратера, вид на землю вдалеке…";
+  if(m==="edit") p.placeholder="Что изменить? напр.: надень казахский чапан и тюбетейку, фон — горы Алатау";
+  else if(m==="face") p.placeholder="Где ты? напр.: в кино рядом с актёрами на красной дорожке, вспышки камер";
+  else p.placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…";
 }
 document.querySelectorAll("#i-mode .seg-btn").forEach(b=>{ b.onclick=()=>setImageMode(b.dataset.imode); });
 document.getElementById("i-photo-x").onclick=()=>{ state.image.photo=null; document.getElementById("i-photo-prev").style.display="none"; document.getElementById("i-mode-row").style.display="none"; iPhotoInput.value=""; iPhotoBtn.textContent="📷 Загрузить фото для переделки"; setImageMode("new"); };

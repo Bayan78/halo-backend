@@ -343,6 +343,30 @@ app.post("/api/video/status", async (req, res) => {
   }
 });
 
+// Универсальный запуск модели: официальные — через /models/{slug}/predictions,
+// community-модели (zsxkib/…, nightmareai/…) — только через version hash.
+async function createPrediction(slug, input) {
+  let r = await fetch(`https://api.replicate.com/v1/models/${slug}/predictions`, {
+    method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({ input })
+  });
+  let d = await r.json();
+  if (r.ok && d.id) return { ok: true, data: d };
+  // fallback: берём последнюю версию модели и запускаем через /v1/predictions
+  try {
+    const m = await fetch(`https://api.replicate.com/v1/models/${slug}`, { headers: { "Authorization": "Bearer " + REPLICATE_TOKEN } });
+    const md = await m.json();
+    const version = md?.latest_version?.id;
+    if (!version) return { ok: false, data: d };
+    r = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ version, input })
+    });
+    d = await r.json();
+    return { ok: r.ok && !!d.id, data: d };
+  } catch (e) { return { ok: false, data: d }; }
+}
+
 // Переделать фото (image-to-image через FLUX Kontext) — PRO, за купленные кредиты
 app.post("/api/restyle", async (req, res) => {
   const u = auth(req, res); if (!u) return;
@@ -355,10 +379,11 @@ app.post("/api/restyle", async (req, res) => {
   if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
   // Инструкцию переводим на английский — Kontext точнее её понимает (иначе «казахский костюм» → кимоно)
   const en = await translateEdit(prompt);
-  // Формулируем как минимальную правку: менять только одежду/фон, лицо не трогать
-  const editPrompt = `${en}. Keep the exact same person: identical face, facial features, eyes, nose, mouth, skin tone, hairstyle and age. Do not change the person's identity or face. Preserve the original pose and framing. Only modify what is requested.`;
+  // Максимально жёсткий запрет на изменение лица: правим только одежду/фон/свет
+  const editPrompt = `${en}. CRITICAL: do not alter the face in any way. The face must remain pixel-identical to the input photo: same facial structure, same eyes, same nose, same mouth, same eyebrows, same skin texture and tone, same age, same hair. Do not beautify, do not restyle, do not change gender or age. Change ONLY the clothing and background as instructed. Preserve the original pose, head angle, framing and lighting direction.`;
+  const restyleSlug = process.env.RESTYLE_MODEL || "black-forest-labs/flux-kontext-max"; // max точнее держит лицо
   try {
-    const rr = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
+    const rr = await fetch(`https://api.replicate.com/v1/models/${restyleSlug}/predictions`, {
       method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({ input: {
         prompt: editPrompt,
@@ -387,12 +412,37 @@ app.post("/api/upscale", async (req, res) => {
   const cost = Number(process.env.COST_UPSCALE || 2) * (scale === 4 ? 2 : 1);
   if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
   try {
-    const rr = await fetch("https://api.replicate.com/v1/models/nightmareai/real-esrgan/predictions", {
-      method: "POST", headers: { "Authorization": "Bearer " + REPLICATE_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ input: { image, scale, face_enhance: true } })
+    const pr = await createPrediction("nightmareai/real-esrgan", { image, scale, face_enhance: true });
+    const d = pr.data;
+    if (!pr.ok) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
+    incCounter("gen_media");
+    res.json({ ok: true, id: d.id, status: d.status, paid: isOwnerId(u.id) ? null : paidBal(u.id) });
+  } catch (e) { if (!isOwnerId(u.id)) addPaid(u.id, cost); res.status(500).json({ ok: false, error: "provider" }); }
+});
+
+// «Я в кадре» — новая сцена с твоим лицом (PuLID сохраняет личность). PRO, за купленные кредиты.
+app.post("/api/faceshot", async (req, res) => {
+  const u = auth(req, res); if (!u) return;
+  if (!isProUser(u.id)) return res.json({ ok: false, error: "pro_required" });
+  const image = req.body && req.body.image ? String(req.body.image) : null;
+  const raw = String((req.body && req.body.prompt) || "").slice(0, 600).trim();
+  if (!image || !raw) return res.status(400).json({ ok: false, error: "need image+prompt" });
+  if (!REPLICATE_TOKEN) return res.status(500).json({ ok: false, error: "no api" });
+  const cost = Number(process.env.COST_FACE || 5);
+  if (!isOwnerId(u.id)) { const r = spendPaid(u.id, cost); if (!r.ok) return res.json({ ok: false, error: "need_paid", paid: r.paid }); }
+  // сцену описываем по-английски (Gemini→Groq), национальные детали сохраняются
+  let scene = await enhanceGemini(raw); if (!scene) scene = await enhanceGroq(raw); if (!scene) scene = raw;
+  const idw = Math.min(3, Math.max(0, Number(req.body.id_weight || 1.2))); // >1 = сильнее держит лицо
+  try {
+    const pr = await createPrediction("zsxkib/flux-pulid", {
+      main_face_image: image,
+      prompt: scene,
+      id_weight: idw,
+      num_outputs: 1,
+      output_format: "jpg"
     });
-    const d = await rr.json();
-    if (!rr.ok || !d.id) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
+    const d = pr.data;
+    if (!pr.ok) { if (!isOwnerId(u.id)) addPaid(u.id, cost); return res.status(502).json({ ok: false, error: "provider", detail: d.detail || null }); }
     incCounter("gen_media");
     res.json({ ok: true, id: d.id, status: d.status, paid: isOwnerId(u.id) ? null : paidBal(u.id) });
   } catch (e) { if (!isOwnerId(u.id)) addPaid(u.id, cost); res.status(500).json({ ok: false, error: "provider" }); }
@@ -490,7 +540,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
 const ENHANCE_PROMPT = (text) => `Ты — эксперт по промптам для AI-генерации фото и видео. Перепиши идею в один яркий детальный промпт на английском (40-70 слов): конкретный субъект, окружение, освещение, ракурс камеры, настроение, художественный стиль. Сохрани имена собственные и казахские/национальные слова и детали как есть (при необходимости латинской транслитерацией). Выведи ТОЛЬКО текст промпта — без кавычек и пояснений.\n\nИдея: ${text}`;
 
 // Перевод инструкции редактирования фото на английский (короткая команда, без фантазий)
-const EDIT_TR_PROMPT = (text) => `Translate this photo-editing instruction into a short English command for an image editing model. Keep it literal and specific. If national clothing or places are mentioned, name them explicitly in English (e.g. Kazakh chapan robe, embroidered takiya cap, Alatau mountains). Do NOT describe the person's face or appearance. Output ONLY the command.\n\nInstruction: ${text}`;
+const EDIT_TR_PROMPT = (text) => `Convert this photo-editing request into a short, literal English command (max 25 words) describing ONLY what to change (clothing, background, lighting, objects). If national clothing or places are mentioned, name them explicitly in English (e.g. Kazakh chapan robe, embroidered takiya cap, Alatau mountains). Never describe the person, their face, age, gender or appearance. Never add camera angles, mood or art style. Output ONLY the command.\n\nRequest: ${text}`;
 async function translateEdit(text){
   if (/^[\x00-\x7F\s.,!?'"()-]+$/.test(text)) return text; // уже английский
   try {
