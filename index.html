@@ -158,6 +158,13 @@
   .store-free:disabled{opacity:.5;cursor:default}
   .store-bal{font-size:12.5px;color:var(--muted);text-align:center;margin:-6px 0 14px}
   .store-bal b{color:var(--txt);font-weight:600}
+  .ideas{display:none;flex-direction:column;gap:8px;margin-top:10px}
+  .ideas.on{display:flex}
+  .idea{text-align:left;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;padding:11px 13px;cursor:pointer;transition:border-color .2s,background .2s}
+  .idea:hover{border-color:var(--violet);background:rgba(168,85,247,.08)}
+  .idea b{display:block;font-family:'Space Grotesk';font-size:13px;font-weight:600;color:var(--txt);margin-bottom:3px}
+  .idea span{display:block;font-size:11.5px;color:var(--muted);line-height:1.45}
+  .ideas-note{font-size:11px;color:var(--muted-dim);text-align:center;padding:2px 0}
 
   /* ===== visual polish ===== */
   body::before{animation:aurora 24s ease-in-out infinite alternate}
@@ -225,6 +232,8 @@
       <label class="fld">Опиши, что создать</label>
       <textarea id="i-prompt" placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…"></textarea>
       <button class="enhance" id="i-enhance"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="currentColor"/></svg>Улучшить промпт через AI</button>
+      <button class="enhance" id="i-ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.3.2.5.6.5 1V16h6v-1.1c0-.4.2-.8.5-1A6 6 0 0012 3z"/></svg>💡 Идеи промптов</button>
+      <div class="ideas" id="i-ideas-list"></div>
       <label class="fld">Переделать своё фото (по описанию)</label>
       <input type="file" id="i-photo" accept="image/*" style="display:none">
       <button class="ptoggle" id="i-photo-btn" style="width:100%;justify-content:center">📷 Загрузить фото для переделки</button>
@@ -278,6 +287,8 @@
       <label class="fld">Опиши сцену</label>
       <textarea id="v-prompt" placeholder="неоновый киберпанк-город под дождём, движение сквозь улицы…"></textarea>
       <button class="enhance" id="v-enhance"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" fill="currentColor"/></svg>Улучшить промпт через AI</button>
+      <button class="enhance" id="v-ideas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.3.2.5.6.5 1V16h6v-1.1c0-.4.2-.8.5-1A6 6 0 0012 3z"/></svg>💡 Идеи промптов</button>
+      <div class="ideas" id="v-ideas-list"></div>
       <div class="seg" id="v-mode">
         <button class="seg-btn on" data-mode="slideshow">Слайд-шоу · free</button>
         <button class="seg-btn" data-mode="story">🎬 Мультфильм</button>
@@ -319,6 +330,20 @@
           <select id="v-ratio"><option value="1280x720">Широкий · 16:9</option><option value="720x1280">Вертикаль · 9:16</option><option value="1024x1024">Квадрат · 1:1</option></select></div>
         <div id="v-frames-cell"><label class="fld" style="margin-top:0">Кадров</label>
           <select id="v-frames"><option value="4">4 · короткий</option><option value="6" selected>6 · средний</option><option value="8">8 · длинный</option><option value="10" data-pro disabled>10 · PRO</option><option value="12" data-pro disabled>12 · PRO</option></select></div>
+      </div>
+      <label class="fld">Быстрый формат</label>
+      <div class="chips" id="v-presets">
+        <button class="chip" data-ratio="720x1280">📱 Shorts / TikTok</button>
+        <button class="chip" data-ratio="1280x720">▶️ YouTube</button>
+        <button class="chip" data-ratio="1024x1024">◻️ Instagram</button>
+      </div>
+      <div id="v-overlay-row">
+        <label class="fld">Текст на видео (хук для Shorts)</label>
+        <input type="text" id="v-overlay" maxlength="60" placeholder="напр.: Смотри до конца 👀" style="width:100%;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;color:var(--txt);padding:12px 14px;font-size:14px;font-family:inherit">
+        <label class="fld">Подпись канала (в углу)</label>
+        <input type="text" id="v-sign" maxlength="30" placeholder="напр.: @mr_bayan1" style="width:100%;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;color:var(--txt);padding:12px 14px;font-size:14px;font-family:inherit">
+        <label class="fld">Заставка</label>
+        <button class="ptoggle" id="v-countdown" style="width:100%;justify-content:center">⏱ Отсчёт 3·2·1 в начале</button>
       </div>
       <div id="v-hd-wrap">
         <label class="fld">PRO-функции</label>
@@ -558,6 +583,42 @@ function wireEnhance(btnId,taId){ const btn=document.getElementById(btnId),ta=do
     try{ ta.value=await enhance(t); }catch(e){ btn.textContent="Не вышло, попробуй ещё"; setTimeout(()=>btn.innerHTML=orig,1600); btn.disabled=false; return; } btn.innerHTML=orig; btn.disabled=false; }; }
 wireEnhance("i-enhance","i-prompt"); wireEnhance("v-enhance","v-prompt");
 
+/* ================= Генератор промптов ================= */
+async function fetchIdeas(text, target){
+  const d = await serverCall("/api/prompts", { text, target });
+  if(!d || !d.ideas || !d.ideas.length) throw new Error("empty");
+  return d.ideas;
+}
+function wireIdeas(btnId, taId, listId, targetFn){
+  const btn=document.getElementById(btnId), ta=document.getElementById(taId), list=document.getElementById(listId);
+  btn.onclick=async()=>{
+    const t=ta.value.trim();
+    if(!t){ ta.focus(); toast("Сначала напиши идею — хоть парой слов"); return; }
+    if(!serverMode){ toast("Генератор промптов работает в Telegram с сервером."); return; }
+    const orig=btn.innerHTML; btn.disabled=true; btn.textContent="Придумываю…"; list.classList.remove("on");
+    try{
+      const target=targetFn();
+      const ideas=await fetchIdeas(t, target);
+      const scenes = target==="story";
+      list.innerHTML = ideas.map((it,i)=>`<button class="idea" data-i="${i}"><b>${it.label}</b><span>${it.prompt}</span></button>`).join("")
+        + (scenes?`<button class="idea" id="${listId}-all"><b>📋 Вставить все сцены</b><span>Каждая сцена с новой строки — готово для режима «Мультфильм»</span></button>`:"")
+        + `<div class="ideas-note">Тапни, чтобы подставить в поле</div>`;
+      list.classList.add("on");
+      list.querySelectorAll(".idea[data-i]").forEach(b=>b.onclick=()=>{
+        const it=ideas[Number(b.dataset.i)];
+        ta.value = scenes ? (ta.value.trim()? ta.value.trim()+"\n"+it.prompt : it.prompt) : it.prompt;
+        if(!scenes) list.classList.remove("on");
+        ta.dispatchEvent(new Event("input"));
+      });
+      const allBtn=document.getElementById(`${listId}-all`);
+      if(allBtn) allBtn.onclick=()=>{ ta.value=ideas.map(x=>x.prompt).join("\n"); list.classList.remove("on"); };
+    }catch(e){ toast("Не вышло придумать. Попробуй ещё раз."); }
+    btn.innerHTML=orig; btn.disabled=false;
+  };
+}
+wireIdeas("i-ideas","i-prompt","i-ideas-list", ()=> (typeof imageMode!=="undefined" && imageMode==="face") ? "image" : "image");
+wireIdeas("v-ideas","v-prompt","v-ideas-list", ()=> (typeof videoMode!=="undefined" && videoMode==="story") ? "story" : "video");
+
 /* ================= Image ================= */
 const iCanvas=document.getElementById("i-canvas"),iDownload=document.getElementById("i-download"),iVariant=document.getElementById("i-variant");
 let imageMode="new";
@@ -595,6 +656,61 @@ async function generateImage(seed){
 document.getElementById("i-go").onclick=()=>generateImage(Math.floor(Math.random()*1e6));
 iVariant.onclick=()=>generateImage(Math.floor(Math.random()*1e6));
 async function downloadURL(url,name){ try{ const r=await fetch(url); const b=await r.blob(); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }catch(e){ window.open(url,"_blank"); } }
+function drawSignature(ctx,w,h){
+  const s=(state.video.sign||"").trim(); if(!s) return;
+  const fs=Math.max(13,Math.round(Math.min(w,h)*0.034));
+  const pad=Math.round(Math.min(w,h)*0.032);
+  ctx.save();
+  ctx.font=`600 ${fs}px 'Space Grotesk', system-ui, sans-serif`;
+  ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+  ctx.globalAlpha=0.9;
+  ctx.lineWidth=Math.max(2,fs*0.18); ctx.strokeStyle="rgba(11,10,20,.75)"; ctx.lineJoin="round";
+  ctx.strokeText(s,pad,h-pad);
+  ctx.fillStyle="#F5F3FF"; ctx.fillText(s,pad,h-pad);
+  ctx.restore();
+}
+function runCountdown(ctx,W,H,bgImg){
+  return new Promise(res=>{
+    const start=performance.now(), per=700, total=3*per;
+    (function tick(now){
+      const t=(now||performance.now())-start;
+      if(t>=total){ res(); return; }
+      const n=3-Math.floor(t/per), p=(t%per)/per;
+      ctx.globalAlpha=1; ctx.fillStyle="#0B0A14"; ctx.fillRect(0,0,W,H);
+      if(bgImg){ ctx.globalAlpha=0.28; try{ ctx.drawImage(bgImg,0,0,W,H); }catch(e){} ctx.globalAlpha=1; }
+      const fs=Math.round(Math.min(W,H)*0.34), scale=1+0.12*(1-p);
+      ctx.save(); ctx.translate(W/2,H/2); ctx.scale(scale,scale);
+      ctx.font=`700 ${fs}px 'Space Grotesk', system-ui, sans-serif`;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.globalAlpha=Math.min(1,1.25-p);
+      const g=ctx.createLinearGradient(-fs/2,0,fs/2,0);
+      g.addColorStop(0,"#C084FC"); g.addColorStop(.5,"#F472B6"); g.addColorStop(1,"#5EEAF2");
+      ctx.lineWidth=fs*0.06; ctx.strokeStyle="rgba(11,10,20,.6)"; ctx.strokeText(String(n),0,0);
+      ctx.fillStyle=g; ctx.fillText(String(n),0,0);
+      ctx.restore();
+      requestAnimationFrame(tick);
+    })();
+  });
+}
+function drawOverlayText(ctx,w,h){
+  const txt=(state.video.overlay||"").trim(); if(!txt) return;
+  const fs=Math.round(Math.min(w,h)*0.075);
+  ctx.save();
+  ctx.font=`700 ${fs}px 'Space Grotesk', system-ui, sans-serif`;
+  ctx.textAlign="center"; ctx.textBaseline="top";
+  // перенос по словам
+  const maxW=w*0.86, words=txt.split(/\s+/), lines=[]; let line="";
+  for(const wd of words){ const t=line?line+" "+wd:wd; if(ctx.measureText(t).width>maxW && line){ lines.push(line); line=wd; } else line=t; }
+  if(line) lines.push(line);
+  const y0=Math.round(h*0.07), lh=Math.round(fs*1.22);
+  lines.forEach((ln,i)=>{
+    const y=y0+i*lh;
+    ctx.lineWidth=Math.max(3,fs*0.16); ctx.strokeStyle="rgba(11,10,20,.85)"; ctx.lineJoin="round";
+    ctx.strokeText(ln,w/2,y);
+    ctx.fillStyle="#fff"; ctx.fillText(ln,w/2,y);
+  });
+  ctx.restore();
+}
 function drawWatermark(ctx,w,h){
   const pad=Math.round(Math.min(w,h)*0.032);
   const fs=Math.max(16,Math.round(Math.min(w,h)*0.05));
@@ -733,6 +849,9 @@ const TEMPLATES=[
   {name:"Мультгерой",emo:"🧸",desc:"3D-мультик 1:1",target:"image",ratio:"1024x1024",styles:["Мультфильм"],prompt:"cute 3D animated cartoon character, big expressive eyes, friendly smile, soft studio lighting, colorful, Pixar-like, high detail"},
   {name:"2D-персонаж",emo:"🎨",desc:"2D-мультик 9:16",target:"image",ratio:"720x1280",styles:["2D-анимация"],prompt:"2D cartoon character full body, bold clean outlines, flat vibrant colors, playful pose, simple background"},
   {name:"Мультклип",emo:"📺",desc:"Мультик-видео",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"animated cartoon scene, cute characters, lively motion, colorful magical world, Pixar-style 3D animation"},
+  {name:"Обложка Shorts",emo:"📱",desc:"Вертикаль 9:16",target:"image",ratio:"720x1280",styles:["Кино","Неон"],prompt:"vertical YouTube Shorts thumbnail, bold dramatic subject centered, high contrast neon lighting, punchy colors, eye-catching, space at top for text"},
+  {name:"Хук для TikTok",emo:"🎯",desc:"Вертикальное видео",target:"video",ratio:"720x1280",styles:["Кино"],prompt:"vertical cinematic scene, dynamic camera push in, dramatic lighting, attention grabbing first frame, social media style"},
+  {name:"Превью канала",emo:"🖼",desc:"YouTube 16:9",target:"image",ratio:"1280x720",styles:["Кино"],prompt:"bold YouTube thumbnail, dramatic subject, high contrast lighting, vivid saturated colors, clean composition with copy space"},
   {name:"Мультик о животных",emo:"🦊",desc:"Видео-мультик",target:"video",ratio:"1280x720",styles:["Мультфильм"],prompt:"cute cartoon animal character in a colorful forest, playful movement, Pixar-style 3D animation, warm lighting, family friendly"},
   {name:"Сказка",emo:"🏰",desc:"Видео-мультик",target:"video",ratio:"1280x720",styles:["Мультфильм","Фэнтези"],prompt:"magical fairytale cartoon scene, enchanted castle, sparkling atmosphere, storybook 3D animation, whimsical characters"},
   {name:"Детская история",emo:"🧒",desc:"Видео-мультик",target:"video",ratio:"720x1280",styles:["2D-анимация"],prompt:"cheerful 2D cartoon for kids, simple bold shapes, bright happy colors, friendly character, storybook animation style"},
@@ -834,6 +953,7 @@ async function renderClip(frames, W, H){
     recorder.onstop=()=>{ state.video.blob=new Blob(chunks,{type:state.video.mime}); vDownload.disabled=false; updateMp4Btn(); };
     recorder.start();
   }catch(e){ recorder=null; }
+  if(state.video.countdown) await runCountdown(ctx,cv.width,cv.height,frames[0]);
   await playSequence(ctx,cv,frames,()=>{ if(recorder&&recorder.state==="recording") recorder.stop(); });
 }
 // Раскадровка: мини-мультфильм из нескольких сцен (по строке на сцену), склейка на клиенте
@@ -869,11 +989,13 @@ function playSequence(ctx,cv,frames,onDone){
     function drawFrame(img,mv,p,alpha){ const z=mv.z0+(mv.z1-mv.z0)*p; const iw=img.width,ih=img.height,cr=W/H,ir=iw/ih; let sw,sh; if(ir>cr){sh=ih;sw=ih*cr;}else{sw=iw;sh=iw/cr;} sw/=z;sh/=z; let sx=(iw-sw)/2+mv.dx*sw*p, sy=(ih-sh)/2+mv.dy*sh*p; sx=Math.max(0,Math.min(iw-sw,sx)); sy=Math.max(0,Math.min(ih-sh,sy)); ctx.globalAlpha=alpha; ctx.drawImage(img,sx,sy,sw,sh,0,0,W,H); }
     const wm = !(ownerFree() || isPro);   // водяной знак на бесплатных клипах
     function loop(now){ const t=now-start, idx=Math.floor(t/perFrame);
-      if(idx>=total){ ctx.globalAlpha=1; drawFrame(frames[total-1],moves[total-1],1,1); if(wm) drawWatermark(ctx,W,H); setTimeout(()=>{onDone&&onDone();resolve();},250); return; }
+      if(idx>=total){ ctx.globalAlpha=1; drawFrame(frames[total-1],moves[total-1],1,1); drawOverlayText(ctx,W,H); drawSignature(ctx,W,H); if(wm) drawWatermark(ctx,W,H); setTimeout(()=>{onDone&&onDone();resolve();},250); return; }
       const local=t-idx*perFrame,p=local/perFrame;
       ctx.globalAlpha=1; ctx.fillStyle="#0B0A14"; ctx.fillRect(0,0,W,H);
       drawFrame(frames[idx],moves[idx],p,1);
       if(local>perFrame-FADE&&idx+1<total){ const fp=(local-(perFrame-FADE))/FADE; drawFrame(frames[idx+1],moves[idx+1],0,fp); }
+      drawOverlayText(ctx,W,H);
+      drawSignature(ctx,W,H);
       if(wm) drawWatermark(ctx,W,H);
       ctx.globalAlpha=1; requestAnimationFrame(loop);
     }
@@ -904,6 +1026,7 @@ document.querySelectorAll("#v-mode .seg-btn").forEach(b=>{
     document.getElementById("v-ai-opts").style.display = videoMode==="ai" ? "" : "none";
     document.getElementById("v-frames-cell").style.display = (videoMode==="ai"||videoMode==="story") ? "none" : "";
     document.getElementById("v-hd-wrap").style.display = videoMode==="ai" ? "none" : "";
+    document.getElementById("v-overlay-row").style.display = videoMode==="ai" ? "none" : "";
     const vp=document.getElementById("v-prompt");
     if(videoMode==="story"){ vp.placeholder="Опиши сцены — по одной в строке:\nМальчик находит волшебный камень\nКамень светится, появляется дракон\nОни летят над степью на закате"; }
     else{ vp.placeholder="космонавт пьёт кофе на краю кратера, вид на землю вдалеке…"; }
@@ -911,6 +1034,21 @@ document.querySelectorAll("#v-mode .seg-btn").forEach(b=>{
   };
 });
 const aiAudioBtn=document.getElementById("v-aiaudio");
+// Пресеты формата (Shorts/TikTok, YouTube, Instagram)
+document.querySelectorAll("#v-presets .chip").forEach(c=>{
+  c.onclick=()=>{
+    document.getElementById("v-ratio").value=c.dataset.ratio;
+    document.querySelectorAll("#v-presets .chip").forEach(x=>x.classList.remove("on"));
+    c.classList.add("on");
+  };
+});
+// Текст-хук на видео (только для слайд-шоу и мультфильма — AI-видео рисует провайдер)
+const vOverlay=document.getElementById("v-overlay");
+vOverlay.oninput=()=>{ state.video.overlay=vOverlay.value; };
+const vSign=document.getElementById("v-sign");
+vSign.oninput=()=>{ state.video.sign=vSign.value; };
+const vCd=document.getElementById("v-countdown");
+vCd.onclick=()=>{ const on=!vCd.classList.contains("on"); vCd.classList.toggle("on",on); state.video.countdown=on; };
 aiAudioBtn.onclick=()=>{ const on=!aiAudioBtn.classList.contains("on"); aiAudioBtn.classList.toggle("on",on); aiAudioBtn.textContent=on?"Звук вкл":"Звук выкл"; };
 // Загрузка своего фото (image-to-video)
 function downscaleImage(file,max){

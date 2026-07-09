@@ -689,4 +689,70 @@ app.get("/api/admin/revoke", (req, res) => {
   res.json({ ok: true, uid });
 });
 
+// Генератор промптов: идея → 4 готовых варианта (или сцены для мультфильма)
+const IDEAS_PROMPT = (text, target) => {
+  if (target === "story") {
+    return `Ты — сценарист мультфильмов. По идее ниже придумай 4 короткие сцены для мини-мультфильма (одна сцена = одно предложение, на русском, простыми словами, последовательный сюжет).
+Верни ТОЛЬКО JSON-массив вида: [{"label":"Сцена 1","prompt":"текст сцены"}]
+Без пояснений, без markdown.
+
+Идея: ${text}`;
+  }
+  const kind = target === "video" ? "видео-клипа" : "изображения";
+  return `Ты — эксперт по промптам для AI-генерации ${kind}. По идее ниже придумай 4 РАЗНЫХ промпта: разные ракурсы, освещение, настроение, стиль.
+Для каждого дай короткий русский заголовок (2-4 слова) и сам промпт на английском (35-60 слов): субъект, окружение, свет, ракурс камеры, настроение, стиль.
+Сохрани имена собственные и казахские/национальные детали (юрта, степь, домбра, чапан, Алатау) — назови их явно по-английски.
+Верни ТОЛЬКО JSON-массив вида: [{"label":"Заголовок","prompt":"english prompt"}]
+Без пояснений, без markdown.
+
+Идея: ${text}`;
+};
+function parseIdeas(raw){
+  if (!raw) return null;
+  const clean = String(raw).replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = clean.indexOf("["), end = clean.lastIndexOf("]");
+  if (start < 0 || end < 0) return null;
+  try {
+    const arr = JSON.parse(clean.slice(start, end + 1));
+    if (!Array.isArray(arr)) return null;
+    return arr.filter(x => x && x.prompt).slice(0, 5).map(x => ({ label: String(x.label || "Вариант").slice(0, 40), prompt: String(x.prompt).slice(0, 600) }));
+  } catch (e) { return null; }
+}
+async function askAI(promptText, maxTokens){
+  try {
+    if (GEMINI_API_KEY) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }], generationConfig: { temperature: 0.9, maxOutputTokens: maxTokens } })
+      });
+      const d = await r.json();
+      const out = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (out) return out;
+    }
+  } catch (e) {}
+  try {
+    if (GROQ_API_KEY) {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", headers: { "Authorization": "Bearer " + GROQ_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0.9, max_tokens: maxTokens, messages: [{ role: "user", content: promptText }] })
+      });
+      const d = await r.json();
+      const out = d?.choices?.[0]?.message?.content;
+      if (out) return out;
+    }
+  } catch (e) {}
+  return null;
+}
+app.post("/api/prompts", async (req, res) => {
+  const u = auth(req, res); if (!u) return;
+  const text = String((req.body && req.body.text) || "").slice(0, 400).trim();
+  const target = ["image", "video", "story"].includes(req.body && req.body.target) ? req.body.target : "image";
+  if (!text) return res.status(400).json({ error: "no text" });
+  if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "no ai configured" });
+  const raw = await askAI(IDEAS_PROMPT(text, target), 900);
+  const ideas = parseIdeas(raw);
+  if (!ideas || !ideas.length) return res.status(502).json({ error: "empty" });
+  res.json({ ok: true, ideas });
+});
+
 app.listen(PORT, () => console.log("HALO backend listening on :" + PORT));
