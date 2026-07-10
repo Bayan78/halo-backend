@@ -165,6 +165,11 @@
   .idea b{display:block;font-family:'Space Grotesk';font-size:13px;font-weight:600;color:var(--txt);margin-bottom:3px}
   .idea span{display:block;font-size:11.5px;color:var(--muted);line-height:1.45}
   .ideas-note{font-size:11px;color:var(--muted-dim);text-align:center;padding:2px 0}
+  .postblk{background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;padding:12px 13px;margin-bottom:9px}
+  .postblk .pk{font-size:10.5px;color:var(--muted-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center}
+  .postblk .pv{font-size:13.5px;color:var(--txt);line-height:1.5;white-space:pre-wrap}
+  .postblk .cp{font-size:11px;color:var(--cyan);cursor:pointer;border:1px solid var(--line-strong);border-radius:7px;padding:3px 8px}
+  .postblk .cp:active{color:#fff}
 
   /* ===== visual polish ===== */
   body::before{animation:aurora 24s ease-in-out infinite alternate}
@@ -364,6 +369,7 @@
         <button class="btn-ghost" id="v-download" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Скачать видео</button>
         <button class="btn-ghost" id="v-replay" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v6h6M20 8a8 8 0 00-14.9-2M20 20v-6h-6M4 16a8 8 0 0014.9 2"/></svg>Заново</button>
         <button class="btn-ghost" id="v-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12v8h16v-8M12 3v13m0-13l-4 4m4-4l4 4"/></svg>Поделиться</button>
+        <button class="btn-ghost" id="v-post"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v10H4zM8 19h8M12 15v4"/></svg>Пост для соцсетей</button>
         <button class="btn-ghost" id="v-mp4" disabled style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>MP4</button>
       </div>
     </div>
@@ -386,6 +392,15 @@
   </section>
 </div>
 <div id="toast"></div>
+<div id="postsheet" class="store-overlay">
+  <div class="store-sheet">
+    <div class="store-head"><h3>Пост для TikTok / YouTube</h3><button id="post-close">✕</button></div>
+    <label class="fld" style="margin-top:0">Опиши идею ролика</label>
+    <textarea id="post-idea" placeholder="напр.: оживил старое фото бабушки, все в шоке" style="width:100%;min-height:70px;background:rgba(11,10,20,.5);border:1px solid var(--line-strong);border-radius:12px;color:var(--txt);padding:12px 14px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+    <button class="store-pro" id="post-go" style="margin-top:10px">✨ Составить пост</button>
+    <div id="post-result" style="display:none;margin-top:14px"></div>
+  </div>
+</div>
 <div id="store" class="store-overlay">
   <div class="store-sheet">
     <div class="store-head"><h3>Кредиты</h3><button id="store-close">✕</button></div>
@@ -1256,6 +1271,38 @@ function updateStoreUI(){
 }
 function refLink(){ return `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=ref_${tgUser?tgUser.id:""}`; }
 document.getElementById("v-share").onclick=()=>{ openLink(`https://t.me/share/url?url=${encodeURIComponent(refLink())}&text=${encodeURIComponent("HALO Studio — AI фото и видео прямо в Telegram ✨")}`); };
+
+/* ================= Генератор постов для соцсетей ================= */
+function openPost(){ document.getElementById("postsheet").classList.add("on"); }
+function closePost(){ document.getElementById("postsheet").classList.remove("on"); }
+document.getElementById("v-post").onclick=openPost;
+document.getElementById("post-close").onclick=closePost;
+document.getElementById("postsheet").onclick=(e)=>{ if(e.target.id==="postsheet") closePost(); };
+function copyText(t){ try{ navigator.clipboard.writeText(t); toast("Скопировано", true); }catch(e){ toast("Выдели и скопируй вручную"); } }
+function postBlock(key,val){
+  return `<div class="postblk"><div class="pk">${key}<span class="cp" data-copy="${encodeURIComponent(val)}">копировать</span></div><div class="pv">${val.replace(/</g,"&lt;")}</div></div>`;
+}
+document.getElementById("post-go").onclick=async()=>{
+  const idea=document.getElementById("post-idea").value.trim();
+  if(!idea){ document.getElementById("post-idea").focus(); toast("Опиши идею ролика"); return; }
+  if(!serverMode){ toast("Генератор постов работает в Telegram с сервером."); return; }
+  const btn=document.getElementById("post-go"), res=document.getElementById("post-result");
+  const orig=btn.textContent; btn.disabled=true; btn.textContent="Составляю…"; res.style.display="none";
+  try{
+    const d=await serverCall("/api/post",{ text:idea });
+    if(!d.ok || !d.post) throw new Error("empty");
+    const p=d.post;
+    res.innerHTML =
+      postBlock("Заголовок", p.title||"") +
+      (p.hook?postBlock("Хук (первые 2 сек)", p.hook):"") +
+      postBlock("Описание", p.description||"") +
+      postBlock("Хэштеги · TikTok", p.tiktok_tags||"") +
+      postBlock("Хэштеги · YouTube", p.youtube_tags||"");
+    res.querySelectorAll(".cp").forEach(b=>b.onclick=()=>copyText(decodeURIComponent(b.dataset.copy)));
+    res.style.display="";
+  }catch(e){ toast("Не вышло составить. Попробуй ещё раз."); }
+  btn.textContent=orig; btn.disabled=false;
+};
 document.getElementById("store-invite").onclick=()=>{
   const link=refLink(), text="Заходи в HALO AI Studio — генерируй фото и видео!";
   openLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);

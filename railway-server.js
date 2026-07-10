@@ -755,4 +755,35 @@ app.post("/api/prompts", async (req, res) => {
   res.json({ ok: true, ideas });
 });
 
+// Генератор постов для TikTok/YouTube: идея → заголовок, описание, хэштеги, хук
+const POST_PROMPT = (text) => `Ты — SMM-эксперт по коротким видео (TikTok, YouTube Shorts) для аудитории Казахстана и СНГ, язык русский.
+По идее ролика ниже составь готовый пост. Пиши цепляще, простым языком, с эмодзи в меру.
+Верни ТОЛЬКО JSON без markdown:
+{
+ "title": "заголовок до 80 символов, цепляющий, с ключевым словом",
+ "hook": "фраза на первые 2 секунды ролика, до 40 символов",
+ "description": "описание 2-3 предложения, первая строка с ключевым словом, в конце призыв 'ссылка в профиле'",
+ "tiktok_tags": "8-12 хэштегов через пробел для TikTok",
+ "youtube_tags": "8-12 хэштегов через пробел для YouTube Shorts"
+}
+
+Идея: ${text}`;
+function parsePost(raw){
+  if (!raw) return null;
+  const clean = String(raw).replace(/```json/gi, "").replace(/```/g, "").trim();
+  const s = clean.indexOf("{"), e = clean.lastIndexOf("}");
+  if (s < 0 || e < 0) return null;
+  try { const o = JSON.parse(clean.slice(s, e + 1)); if (!o.title) return null; return o; } catch (err) { return null; }
+}
+app.post("/api/post", async (req, res) => {
+  const u = auth(req, res); if (!u) return;
+  const text = String((req.body && req.body.text) || "").slice(0, 400).trim();
+  if (!text) return res.status(400).json({ error: "no text" });
+  if (!GEMINI_API_KEY && !GROQ_API_KEY) return res.status(500).json({ error: "no ai configured" });
+  const raw = await askAI(POST_PROMPT(text), 700);
+  const post = parsePost(raw);
+  if (!post) return res.status(502).json({ error: "empty" });
+  res.json({ ok: true, post });
+});
+
 app.listen(PORT, () => console.log("HALO backend listening on :" + PORT));
